@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Select-Object Name)",
+      "PowerShell(Get-ChildItem C:\\\\Users\\\\dciel\\\\logit | Where-Object { $_.Name -ne \"node_modules\" } | Select-Object Name, LastWriteTime)",
+      "PowerShell(npm run *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\dciel\\\\Downloads\" | Where-Object { $_.Name -match \"LogIt|format-report\" } | Format-Table Name, LastWriteTime -AutoSize)"
+    ]
+  }
+}
