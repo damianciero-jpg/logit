@@ -1,66 +1,6 @@
-import { useState, useEffect, useRef } from "react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
-
-// ── Shared Data ──────────────────────────────────────────────────────────────
-const CHILDREN = [
-  {
-    id: 1, name: "Jordan", age: 8, avatar: "👦", color: "#6366F1",
-    parent: "Lisa M.", therapist: "Dr. Chen",
-    sessions: [
-      { date: "Mon", mood: "happy",   stars: 3, time: "3:45 PM", game: "Star Collector" },
-      { date: "Mon", mood: "calm",    stars: 3, time: "4:10 PM", game: "Bubble Breath"  },
-      { date: "Tue", mood: "anxious", stars: 2, time: "8:12 AM", game: "Cloud Catcher"  },
-      { date: "Tue", mood: "angry",   stars: 1, time: "3:55 PM", game: "Volcano Stomp"  },
-      { date: "Tue", mood: "anxious", stars: 2, time: "5:30 PM", game: "Cloud Catcher"  },
-      { date: "Wed", mood: "happy",   stars: 3, time: "9:00 AM", game: "Star Collector" },
-      { date: "Wed", mood: "calm",    stars: 3, time: "2:20 PM", game: "Bubble Breath"  },
-      { date: "Thu", mood: "sad",     stars: 2, time: "7:45 AM", game: "Rainbow Painter"},
-      { date: "Thu", mood: "tired",   stars: 1, time: "3:30 PM", game: "Dream Catch"    },
-      { date: "Thu", mood: "angry",   stars: 2, time: "6:00 PM", game: "Volcano Stomp"  },
-      { date: "Fri", mood: "happy",   stars: 3, time: "8:30 AM", game: "Star Collector" },
-      { date: "Fri", mood: "calm",    stars: 3, time: "4:00 PM", game: "Bubble Breath"  },
-      { date: "Sat", mood: "happy",   stars: 3, time: "10:15 AM", game: "Star Collector"},
-      { date: "Sat", mood: "happy",   stars: 3, time: "2:00 PM", game: "Star Collector" },
-      { date: "Sun", mood: "calm",    stars: 3, time: "11:00 AM", game: "Bubble Breath" },
-    ],
-    iepGoals: ["Emotional regulation: 4/5", "Communication: 3/5", "Social skills: 3/5", "Sensory tolerance: 4/5"],
-    notes: "Jordan responds well to morning sessions. Afternoon frustration patterns noted on school days.",
-  },
-  {
-    id: 2, name: "Mia", age: 6, avatar: "👧", color: "#EC4899",
-    parent: "Tom K.", therapist: "Dr. Chen",
-    sessions: [
-      { date: "Mon", mood: "calm",    stars: 3, time: "9:00 AM", game: "Bubble Breath"  },
-      { date: "Mon", mood: "happy",   stars: 3, time: "3:00 PM", game: "Star Collector" },
-      { date: "Tue", mood: "sad",     stars: 2, time: "8:00 AM", game: "Rainbow Painter"},
-      { date: "Tue", mood: "anxious", stars: 1, time: "4:00 PM", game: "Cloud Catcher"  },
-      { date: "Wed", mood: "happy",   stars: 3, time: "10:00 AM", game: "Star Collector"},
-      { date: "Thu", mood: "calm",    stars: 3, time: "9:30 AM", game: "Bubble Breath"  },
-      { date: "Thu", mood: "angry",   stars: 1, time: "3:45 PM", game: "Volcano Stomp"  },
-      { date: "Fri", mood: "happy",   stars: 3, time: "8:00 AM", game: "Star Collector" },
-      { date: "Sat", mood: "calm",    stars: 3, time: "11:00 AM", game: "Bubble Breath" },
-    ],
-    iepGoals: ["Emotional regulation: 3/5", "Communication: 4/5", "Social skills: 2/5", "Sensory tolerance: 3/5"],
-    notes: "Mia thrives in morning routines. Afternoon transitions are a challenge, especially Tuesdays.",
-  },
-  {
-    id: 3, name: "Eli", age: 10, avatar: "🧒", color: "#F59E0B",
-    parent: "Rosa P.", therapist: "Dr. Chen",
-    sessions: [
-      { date: "Mon", mood: "angry",   stars: 1, time: "7:50 AM", game: "Volcano Stomp"  },
-      { date: "Mon", mood: "anxious", stars: 2, time: "3:30 PM", game: "Cloud Catcher"  },
-      { date: "Tue", mood: "calm",    stars: 3, time: "9:00 AM", game: "Bubble Breath"  },
-      { date: "Wed", mood: "angry",   stars: 1, time: "7:45 AM", game: "Volcano Stomp"  },
-      { date: "Wed", mood: "tired",   stars: 2, time: "3:00 PM", game: "Dream Catch"    },
-      { date: "Thu", mood: "happy",   stars: 3, time: "10:00 AM", game: "Star Collector"},
-      { date: "Fri", mood: "anxious", stars: 2, time: "8:00 AM", game: "Cloud Catcher"  },
-      { date: "Fri", mood: "angry",   stars: 1, time: "3:45 PM", game: "Volcano Stomp"  },
-      { date: "Sat", mood: "happy",   stars: 3, time: "9:00 AM", game: "Star Collector" },
-    ],
-    iepGoals: ["Emotional regulation: 2/5", "Communication: 3/5", "Social skills: 3/5", "Sensory tolerance: 2/5"],
-    notes: "Eli shows a consistent Monday morning frustration pattern. Peer interactions at school may be a trigger.",
-  },
-];
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis } from "recharts";
 
 const MOOD_META = {
   happy:   { emoji: "😄", label: "Happy",      color: "#F59E0B", light: "#FEF3C7", score: 5 },
@@ -69,6 +9,12 @@ const MOOD_META = {
   sad:     { emoji: "😢", label: "Sad",        color: "#8B5CF6", light: "#EDE9FE", score: 2 },
   anxious: { emoji: "😟", label: "Worried",    color: "#3B82F6", light: "#DBEAFE", score: 2 },
   angry:   { emoji: "😠", label: "Frustrated", color: "#EF4444", light: "#FEE2E2", score: 1 },
+};
+
+const NOTIF_META = {
+  alert:    { color: "#EF4444", icon: "⚠️" },
+  pattern:  { color: "#8B5CF6", icon: "📅" },
+  positive: { color: "#10B981", icon: "🎉" },
 };
 
 const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -94,86 +40,6 @@ function stressCount(sessions) {
   return sessions.filter(s => ["anxious","angry","sad"].includes(s.mood)).length;
 }
 
-// ── Notification Engine ──────────────────────────────────────────────────────
-function generateNotifications(children) {
-  const notifs = [];
-  children.forEach(child => {
-    const sessions = child.sessions;
-    const stress = stressCount(sessions);
-    const recentAngry = sessions.filter(s => s.date === "Thu" && s.mood === "angry");
-    const morningStress = sessions.filter(s => {
-      const hour = parseInt(s.time.split(":")[0]);
-      const isPM = s.time.includes("PM");
-      const h24 = isPM && hour !== 12 ? hour+12 : hour;
-      return h24 < 10 && ["anxious","angry","sad"].includes(s.mood);
-    });
-    const avgStars = sessions.reduce((a,s)=>a+s.stars,0)/sessions.length;
-
-    if (stress >= 4) {
-      notifs.push({
-        id: `${child.id}-stress`,
-        childId: child.id,
-        childName: child.name,
-        childAvatar: child.avatar,
-        type: "alert",
-        title: `${child.name} had ${stress} stress sessions this week`,
-        body: "Elevated frustration and worry patterns detected. Consider checking in.",
-        time: "2 min ago",
-        read: false,
-        color: "#EF4444",
-        icon: "⚠️",
-      });
-    }
-    if (morningStress.length >= 2) {
-      notifs.push({
-        id: `${child.id}-morning`,
-        childId: child.id,
-        childName: child.name,
-        childAvatar: child.avatar,
-        type: "pattern",
-        title: `Morning stress pattern for ${child.name}`,
-        body: `${morningStress.length} difficult morning sessions detected. May align with school schedule.`,
-        time: "1 hr ago",
-        read: false,
-        color: "#F97316",
-        icon: "🌅",
-      });
-    }
-    if (avgStars >= 2.8) {
-      notifs.push({
-        id: `${child.id}-great`,
-        childId: child.id,
-        childName: child.name,
-        childAvatar: child.avatar,
-        type: "positive",
-        title: `Great week for ${child.name}! 🌟`,
-        body: `Average of ${avgStars.toFixed(1)} stars across ${sessions.length} sessions. Keep it up!`,
-        time: "3 hr ago",
-        read: true,
-        color: "#10B981",
-        icon: "🎉",
-      });
-    }
-    if (recentAngry.length > 0) {
-      notifs.push({
-        id: `${child.id}-thursday`,
-        childId: child.id,
-        childName: child.name,
-        childAvatar: child.avatar,
-        type: "pattern",
-        title: `Thursday afternoon trend — ${child.name}`,
-        body: "Frustrated mood logged Thursday evenings for 2+ weeks. May be post-school fatigue.",
-        time: "Yesterday",
-        read: true,
-        color: "#8B5CF6",
-        icon: "📅",
-      });
-    }
-  });
-  return notifs.sort((a,b) => (a.read === b.read ? 0 : a.read ? 1 : -1));
-}
-
-// ── Radar/Wellness data ──────────────────────────────────────────────────────
 function buildRadarData(sessions) {
   const total = sessions.length || 1;
   const happyCalm = sessions.filter(s=>["happy","calm"].includes(s.mood)).length;
@@ -185,21 +51,40 @@ function buildRadarData(sessions) {
     const h24 = isPM && h!==12 ? h+12 : h;
     return h24 < 12 && ["happy","calm"].includes(s.mood);
   }).length;
+  const morningSessions = sessions.filter(s => !s.time.includes("PM") || parseInt(s.time.split(":")[0]) === 12);
   return [
     { subject: "Regulation",  A: Math.round((happyCalm/total)*100) },
     { subject: "Engagement",  A: Math.round((avgStars/3)*100)      },
     { subject: "Consistency", A: Math.min(100, total * 7)           },
-    { subject: "Morning",     A: Math.round((morningGood/Math.max(1,sessions.filter(s=>{const h=parseInt(s.time);return !s.time.includes("PM")||h===12;}).length))*100) },
+    { subject: "Morning",     A: Math.round((morningGood/Math.max(1, morningSessions.length))*100) },
     { subject: "Recovery",    A: Math.max(0, 100 - Math.round((stressS/total)*100)) },
   ];
 }
 
-// ── PDF Report (HTML print) ──────────────────────────────────────────────────
+function formatRelativeTime(isoString) {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1)   return "Just now";
+  if (mins < 60)  return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function dbSessionToRow(s) {
+  return {
+    date:  s.day_label,
+    mood:  s.mood,
+    stars: s.stars,
+    game:  s.game,
+    time:  new Date(s.played_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+  };
+}
+
 function openPDFReport(child) {
   const breakdown = buildMoodBreakdown(child.sessions);
-  const avgStars = (child.sessions.reduce((a,s)=>a+s.stars,0)/child.sessions.length).toFixed(1);
+  const avgStars = (child.sessions.reduce((a,s)=>a+s.stars,0)/Math.max(1,child.sessions.length)).toFixed(1);
   const stress = stressCount(child.sessions);
-  const chartD = buildChartData(child.sessions);
 
   const html = `<!DOCTYPE html>
 <html>
@@ -268,7 +153,7 @@ function openPDFReport(child) {
     <div class="mood-row">
       <span style="font-size:18px">${m.emoji}</span>
       <span style="font-weight:600;width:90px;font-size:13px">${m.label}</span>
-      <div class="bar-bg"><div class="bar-fill" style="width:${(m.value/child.sessions.length)*100}%;background:${m.color}"></div></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${(m.value/Math.max(1,child.sessions.length))*100}%;background:${m.color}"></div></div>
       <span style="font-size:13px;color:#94A3B8;width:40px;text-align:right">${m.value}x</span>
     </div>
   `).join("")}
@@ -279,7 +164,7 @@ function openPDFReport(child) {
   ${stress >= 4 ? `<div class="alert-box">⚠️ <strong>Elevated stress pattern:</strong> ${stress} stress-category sessions logged this week. Review daily triggers with parent.</div>` : ""}
   ${parseFloat(avgStars) >= 2.5 ? `<div class="good-box">✅ <strong>Strong engagement:</strong> Average star rating of ${avgStars}/3 indicates good session quality and follow-through.</div>` : ""}
   ${child.sessions.filter(s=>s.date==="Tue"&&["anxious","angry"].includes(s.mood)).length >= 2 ? `<div class="alert-box">📅 <strong>Tuesday pattern:</strong> Multiple stress events logged on Tuesdays. May correlate with school schedule or transitions.</div>` : ""}
-  <div class="good-box">🎮 <strong>Most-played game:</strong> ${[...child.sessions].sort((a,b)=>child.sessions.filter(s=>s.game===b.game).length - child.sessions.filter(s=>s.game===a.game).length)[0]?.game} — child demonstrates preference for this regulation tool.</div>
+  ${child.sessions.length > 0 ? `<div class="good-box">🎮 <strong>Most-played game:</strong> ${[...child.sessions].sort((a,b)=>child.sessions.filter(s=>s.game===b.game).length - child.sessions.filter(s=>s.game===a.game).length)[0]?.game || "—"} — child demonstrates preference for this regulation tool.</div>` : ""}
 </div>
 
 <div class="section">
@@ -308,7 +193,7 @@ function openPDFReport(child) {
 
 <div class="section">
   <div class="section-title">Therapist Notes</div>
-  <div class="notes-box">${child.notes}</div>
+  <div class="notes-box">${child.notes || "No notes recorded this week."}</div>
 </div>
 
 <div class="footer">
@@ -322,7 +207,6 @@ function openPDFReport(child) {
   win.document.close();
 }
 
-// ── UI Components ────────────────────────────────────────────────────────────
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload?.length && payload[0].value !== null) {
     const score = payload[0].value;
@@ -337,13 +221,104 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function CalmPathApp() {
-  const [view, setView] = useState("notifications"); // notifications | therapist | report
-  const [notifications, setNotifications] = useState(() => generateNotifications(CHILDREN));
-  const [selectedChild, setSelectedChild] = useState(CHILDREN[0]);
+  const [view, setView]               = useState("notifications");
+  const [children, setChildren]       = useState([]);
+  const [childrenLoading, setChildrenLoading] = useState(true);
+  const [therapistName, setTherapistName]     = useState("Therapist");
+  const [notifications, setNotifications]     = useState([]);
+  const [selectedChild, setSelectedChild]     = useState(null);
   const [notifFilter, setNotifFilter] = useState("all");
-  const [aiNotes, setAiNotes] = useState({});
-  const [aiLoading, setAiLoading] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [aiNotes, setAiNotes]         = useState({});
+  const [aiLoading, setAiLoading]     = useState(false);
+  const [toast, setToast]             = useState(null);
+
+  // ── Load children + sessions + goals + notes ──────────────────
+  useEffect(() => {
+    const load = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setChildrenLoading(false); return; }
+
+      setTherapistName(user.user_metadata?.full_name ?? "Therapist");
+
+      const { data: childRows } = await supabase
+        .from("children")
+        .select("*, parent:profiles!children_parent_id_fkey(full_name)")
+        .order("created_at");
+
+      if (!childRows?.length) { setChildrenLoading(false); return; }
+
+      const ids = childRows.map(c => c.id);
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+
+      const [sessRes, goalsRes, notesRes] = await Promise.all([
+        supabase.from("sessions").select("*").in("child_id", ids).gte("played_at", weekAgo.toISOString()).order("played_at"),
+        supabase.from("iep_goals").select("*").in("child_id", ids),
+        supabase.from("therapist_notes").select("*").in("child_id", ids).order("created_at", { ascending: false }),
+      ]);
+
+      const allSessions = sessRes.data ?? [];
+      const allGoals    = goalsRes.data ?? [];
+      const allNotes    = notesRes.data ?? [];
+
+      const built = childRows.map(child => ({
+        id:       child.id,
+        name:     child.name,
+        age:      child.age,
+        avatar:   child.avatar,
+        color:    child.color,
+        parent:   child.parent?.full_name ?? "Parent",
+        therapist: user.user_metadata?.full_name ?? "Therapist",
+        sessions: allSessions.filter(s => s.child_id === child.id).map(dbSessionToRow),
+        iepGoals: allGoals.filter(g => g.child_id === child.id).map(g => `${g.label}: ${g.score}/${g.max_score}`),
+        notes:    allNotes.find(n => n.child_id === child.id)?.content ?? "",
+      }));
+
+      setChildren(built);
+      setSelectedChild(built[0] ?? null);
+      setChildrenLoading(false);
+    };
+    load();
+  }, []);
+
+  // ── Load notifications + Realtime ────────────────────────────
+  useEffect(() => {
+    const supabase = createClient();
+
+    const loadNotifs = async () => {
+      const { data } = await supabase
+        .from("notifications")
+        .select("*, child:children(name, avatar, color)")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (data) {
+        setNotifications(data.map(n => ({
+          id:          n.id,
+          childId:     n.child_id,
+          childName:   n.child?.name   ?? "",
+          childAvatar: n.child?.avatar ?? "👦",
+          type:        n.type,
+          title:       n.title,
+          body:        n.body,
+          time:        formatRelativeTime(n.created_at),
+          read:        n.read,
+          color:       NOTIF_META[n.type]?.color ?? "#6366F1",
+          icon:        NOTIF_META[n.type]?.icon  ?? "🔔",
+        })));
+      }
+    };
+
+    loadNotifs();
+
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" },
+        () => loadNotifs())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const unread = notifications.filter(n => !n.read).length;
 
@@ -354,50 +329,48 @@ export default function CalmPathApp() {
 
   function markRead(id) {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    const supabase = createClient();
+    supabase.from("notifications").update({ read: true }).eq("id", id).then(() => {});
   }
-  function markAllRead() {
+
+  async function markAllRead() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     showToast("All notifications marked as read");
+    const supabase = createClient();
+    const ids = notifications.filter(n => !n.read).map(n => n.id);
+    if (ids.length) {
+      await supabase.from("notifications").update({ read: true }).in("id", ids);
+    }
   }
+
   function dismissNotif(id) {
     setNotifications(prev => prev.filter(n => n.id !== id));
     showToast("Notification dismissed");
   }
 
   async function fetchAINotes(child) {
-    if (aiNotes[child.id]) return;
+    if (!child || aiNotes[child.id]) return;
+    if (!child.sessions.length) {
+      setAiNotes(prev => ({ ...prev, [child.id]: { error: true } }));
+      return;
+    }
     setAiLoading(true);
     try {
-      const summary = child.sessions.map(s => `${s.date} ${s.time}: ${s.mood}, ${s.stars} stars`).join("; ");
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/ai-insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: `You are a child behavioral therapist assistant analyzing a week of app data for a child with autism.
-
-Child: ${child.name}, age ${child.age}
-Session data: ${summary}
-IEP Goals: ${child.iepGoals.join(", ")}
-
-Return ONLY a JSON object (no markdown) with:
-{
-  "clinicalSummary": "2-3 sentence clinical summary for the therapist",
-  "patterns": ["pattern 1", "pattern 2", "pattern 3"],
-  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3"],
-  "parentTalkingPoints": ["point 1", "point 2"]
-}`
-          }]
-        })
+          sessions:  child.sessions,
+          childName: child.name,
+          childAge:  child.age,
+          iepGoals:  child.iepGoals,
+          mode:      "therapist",
+        }),
       });
-      const data = await res.json();
-      const text = data.content?.find(b => b.type==="text")?.text || "{}";
-      const parsed = JSON.parse(text.replace(/```json|```/g,"").trim());
-      setAiNotes(prev => ({ ...prev, [child.id]: parsed }));
-    } catch(e) {
+      const { data, error } = await res.json();
+      if (error) throw new Error(error);
+      setAiNotes(prev => ({ ...prev, [child.id]: data }));
+    } catch {
       setAiNotes(prev => ({ ...prev, [child.id]: { error: true } }));
     } finally {
       setAiLoading(false);
@@ -405,7 +378,7 @@ Return ONLY a JSON object (no markdown) with:
   }
 
   useEffect(() => {
-    if (view === "therapist") fetchAINotes(selectedChild);
+    if (view === "therapist" && selectedChild) fetchAINotes(selectedChild);
   }, [view, selectedChild]);
 
   const filteredNotifs = notifFilter === "all"
@@ -414,10 +387,10 @@ Return ONLY a JSON object (no markdown) with:
     ? notifications.filter(n => !n.read)
     : notifications.filter(n => n.type === notifFilter);
 
-  const notes = aiNotes[selectedChild.id];
-  const radarData = buildRadarData(selectedChild.sessions);
-  const chartData = buildChartData(selectedChild.sessions);
-  const breakdown = buildMoodBreakdown(selectedChild.sessions);
+  const notes     = aiNotes[selectedChild?.id ?? ""];
+  const radarData = buildRadarData(selectedChild?.sessions ?? []);
+  const chartData = buildChartData(selectedChild?.sessions ?? []);
+  const breakdown = buildMoodBreakdown(selectedChild?.sessions ?? []);
 
   const NAV = [
     { id:"notifications", label:"Notifications", icon:"🔔", badge: unread },
@@ -434,6 +407,7 @@ Return ONLY a JSON object (no markdown) with:
         @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
         @keyframes toastIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
         @keyframes ping { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
         .nav-btn:hover { background:#F1F5F9 !important; }
         .notif-card:hover { box-shadow:0 4px 20px rgba(0,0,0,0.1) !important; }
         .child-tab:hover { background:#F8FAFC !important; }
@@ -467,7 +441,7 @@ Return ONLY a JSON object (no markdown) with:
               {NAV.map(n => (
                 <button key={n.id} className="nav-btn" onClick={()=>setView(n.id)} style={{
                   display:"flex", alignItems:"center", gap:"6px",
-                  padding:"8px 14px", background:"none", border:"none",
+                  padding:"8px 14px", border:"none",
                   borderRadius:"10px", cursor:"pointer",
                   fontFamily:"'Outfit',sans-serif", fontWeight:view===n.id?700:500,
                   fontSize:"0.83rem",
@@ -595,141 +569,170 @@ Return ONLY a JSON object (no markdown) with:
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"1.25rem" }}>
                 <div>
                   <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1.5rem", color:"#0F172A" }}>Therapist Dashboard</div>
-                  <div style={{ fontSize:"0.78rem", color:"#94A3B8", marginTop:"2px" }}>Dr. Chen · {CHILDREN.length} active patients this week</div>
-                </div>
-              </div>
-
-              {/* Child selector tabs */}
-              <div style={{ display:"flex", gap:"10px", marginBottom:"1.5rem", overflowX:"auto", paddingBottom:"4px" }}>
-                {CHILDREN.map(child => (
-                  <button key={child.id} className="child-tab" onClick={()=>{ setSelectedChild(child); if(view==="therapist") fetchAINotes(child); }} style={{
-                    display:"flex", alignItems:"center", gap:"8px", padding:"10px 16px",
-                    background:selectedChild.id===child.id?"white":"#F1F5F9",
-                    border:`2px solid ${selectedChild.id===child.id?child.color:"transparent"}`,
-                    borderRadius:"14px", cursor:"pointer", flexShrink:0,
-                    fontFamily:"'Outfit',sans-serif", transition:"all 0.15s",
-                    boxShadow: selectedChild.id===child.id ? `0 2px 12px ${child.color}22` : "none",
-                  }}>
-                    <span style={{ fontSize:"1.4rem" }}>{child.avatar}</span>
-                    <div style={{ textAlign:"left" }}>
-                      <div style={{ fontWeight:700, fontSize:"0.85rem", color:selectedChild.id===child.id?child.color:"#374151" }}>{child.name}</div>
-                      <div style={{ fontSize:"0.72rem", color:"#94A3B8" }}>Age {child.age} · {child.sessions.length} sessions</div>
-                    </div>
-                    {stressCount(child.sessions) >= 3 && (
-                      <span style={{ background:"#FEE2E2", color:"#EF4444", borderRadius:"20px", padding:"2px 7px", fontSize:"0.65rem", fontWeight:800 }}>
-                        {stressCount(child.sessions)} alerts
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              {/* Child detail */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
-
-                {/* Mood trend */}
-                <div style={{ background:"white", borderRadius:"18px", padding:"1.25rem", boxShadow:"0 1px 8px rgba(0,0,0,0.06)" }}>
-                  <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1rem", color:"#0F172A", marginBottom:"1rem" }}>Mood Trend</div>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <LineChart data={chartData} margin={{left:-20,right:8,top:4,bottom:0}}>
-                      <XAxis dataKey="day" tick={{fontFamily:"'Outfit',sans-serif",fontSize:11,fill:"#94A3B8"}} axisLine={false} tickLine={false}/>
-                      <YAxis domain={[0,5]} ticks={[1,3,5]} tick={{fontSize:10,fill:"#CBD5E1"}} axisLine={false} tickLine={false}/>
-                      <Tooltip content={<CustomTooltip/>}/>
-                      <Line type="monotone" dataKey="score" stroke={selectedChild.color} strokeWidth={2.5} dot={{fill:selectedChild.color,r:4,strokeWidth:0}} connectNulls={false}/>
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Wellness radar */}
-                <div style={{ background:"white", borderRadius:"18px", padding:"1.25rem", boxShadow:"0 1px 8px rgba(0,0,0,0.06)" }}>
-                  <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1rem", color:"#0F172A", marginBottom:"0.5rem" }}>Wellness Profile</div>
-                  <ResponsiveContainer width="100%" height={170}>
-                    <RadarChart data={radarData} margin={{top:0,right:20,bottom:0,left:20}}>
-                      <PolarGrid stroke="#F1F5F9"/>
-                      <PolarAngleAxis dataKey="subject" tick={{fontFamily:"'Outfit',sans-serif",fontSize:10,fill:"#94A3B8"}}/>
-                      <Radar name={selectedChild.name} dataKey="A" stroke={selectedChild.color} fill={selectedChild.color} fillOpacity={0.25} strokeWidth={2}/>
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* AI Clinical Notes */}
-              <div style={{ background:"white", borderRadius:"18px", padding:"1.25rem", boxShadow:"0 1px 8px rgba(0,0,0,0.06)", marginBottom:"14px" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"1rem" }}>
-                  <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1rem", color:"#0F172A" }}>
-                    🧠 AI Clinical Notes — {selectedChild.name}
+                  <div style={{ fontSize:"0.78rem", color:"#94A3B8", marginTop:"2px" }}>
+                    {therapistName} · {childrenLoading ? "…" : `${children.length} active patient${children.length !== 1 ? "s" : ""} this week`}
                   </div>
-                  <div style={{ fontSize:"0.72rem", color:"#94A3B8" }}>Powered by Claude</div>
                 </div>
+              </div>
 
-                {aiLoading && !notes && (
-                  <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
-                    {[120,80,100,80].map((w,i)=>(
-                      <div key={i} style={{ height:"14px", borderRadius:"7px", width:`${w}%`, background:"linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%)", backgroundSize:"400px 100%", animation:"shimmer 1.4s ease infinite", animationDelay:`${i*0.1}s` }}/>
+              {childrenLoading ? (
+                <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+                  {[1,2,3].map(i => (
+                    <div key={i} style={{ height:"80px", borderRadius:"14px", background:"linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%)", backgroundSize:"400px 100%", animation:"shimmer 1.4s ease infinite", animationDelay:`${i*0.1}s` }}/>
+                  ))}
+                </div>
+              ) : children.length === 0 ? (
+                <div style={{ textAlign:"center", padding:"3rem", color:"#CBD5E1" }}>No patients assigned yet.</div>
+              ) : (
+                <>
+                  {/* Child selector tabs */}
+                  <div style={{ display:"flex", gap:"10px", marginBottom:"1.5rem", overflowX:"auto", paddingBottom:"4px" }}>
+                    {children.map(child => (
+                      <button key={child.id} className="child-tab" onClick={()=>{ setSelectedChild(child); if(view==="therapist") fetchAINotes(child); }} style={{
+                        display:"flex", alignItems:"center", gap:"8px", padding:"10px 16px",
+                        background:selectedChild?.id===child.id?"white":"#F1F5F9",
+                        border:`2px solid ${selectedChild?.id===child.id?child.color:"transparent"}`,
+                        borderRadius:"14px", cursor:"pointer", flexShrink:0,
+                        fontFamily:"'Outfit',sans-serif", transition:"all 0.15s",
+                        boxShadow: selectedChild?.id===child.id ? `0 2px 12px ${child.color}22` : "none",
+                      }}>
+                        <span style={{ fontSize:"1.4rem" }}>{child.avatar}</span>
+                        <div style={{ textAlign:"left" }}>
+                          <div style={{ fontWeight:700, fontSize:"0.85rem", color:selectedChild?.id===child.id?child.color:"#374151" }}>{child.name}</div>
+                          <div style={{ fontSize:"0.72rem", color:"#94A3B8" }}>Age {child.age} · {child.sessions.length} sessions</div>
+                        </div>
+                        {stressCount(child.sessions) >= 3 && (
+                          <span style={{ background:"#FEE2E2", color:"#EF4444", borderRadius:"20px", padding:"2px 7px", fontSize:"0.65rem", fontWeight:800 }}>
+                            {stressCount(child.sessions)} alerts
+                          </span>
+                        )}
+                      </button>
                     ))}
                   </div>
-                )}
 
-                {notes && !notes.error && (
-                  <div style={{ display:"flex", flexDirection:"column", gap:"14px", animation:"slideIn 0.4s ease" }}>
-                    <div style={{ background:"#F8FAFC", borderRadius:"12px", padding:"12px 16px", fontSize:"0.85rem", color:"#374151", lineHeight:1.6, borderLeft:`3px solid ${selectedChild.color}` }}>
-                      {notes.clinicalSummary}
-                    </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
-                      <div>
-                        <div style={{ fontSize:"0.72rem", fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"8px" }}>Observed Patterns</div>
-                        {notes.patterns?.map((p,i)=>(
-                          <div key={i} style={{ display:"flex", gap:"6px", fontSize:"0.8rem", color:"#475569", marginBottom:"6px", lineHeight:1.4 }}>
-                            <span style={{ color:selectedChild.color, flexShrink:0 }}>•</span>{p}
-                          </div>
-                        ))}
-                      </div>
-                      <div>
-                        <div style={{ fontSize:"0.72rem", fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"8px" }}>Recommendations</div>
-                        {notes.recommendations?.map((r,i)=>(
-                          <div key={i} style={{ display:"flex", gap:"6px", fontSize:"0.8rem", color:"#475569", marginBottom:"6px", lineHeight:1.4 }}>
-                            <span style={{ color:"#10B981", flexShrink:0 }}>→</span>{r}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {notes.parentTalkingPoints?.length > 0 && (
-                      <div style={{ background:"#EFF6FF", borderRadius:"12px", padding:"12px 16px" }}>
-                        <div style={{ fontSize:"0.72rem", fontWeight:700, color:"#3B82F6", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"8px" }}>Parent Talking Points</div>
-                        {notes.parentTalkingPoints.map((p,i)=>(
-                          <div key={i} style={{ fontSize:"0.8rem", color:"#1E40AF", marginBottom:"4px", display:"flex", gap:"6px" }}>
-                            <span>💬</span>{p}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                  {selectedChild && (
+                    <>
+                      {/* Child detail */}
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
 
-                {notes?.error && (
-                  <div style={{ color:"#EF4444", fontSize:"0.85rem" }}>Couldn't load AI notes. <button onClick={()=>fetchAINotes(selectedChild)} style={{ background:"none", border:"none", color:"#6366F1", cursor:"pointer", fontWeight:700, fontFamily:"'Outfit',sans-serif" }}>Retry</button></div>
-                )}
-              </div>
-
-              {/* IEP Goals */}
-              <div style={{ background:"white", borderRadius:"18px", padding:"1.25rem", boxShadow:"0 1px 8px rgba(0,0,0,0.06)" }}>
-                <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1rem", color:"#0F172A", marginBottom:"1rem" }}>IEP Goal Progress</div>
-                <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
-                  {selectedChild.iepGoals.map((g,i) => {
-                    const [label, score] = g.split(":");
-                    const [num, den] = score.trim().split("/").map(Number);
-                    return (
-                      <div key={i} style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                        <div style={{ width:"140px", fontSize:"0.82rem", fontWeight:600, color:"#374151", flexShrink:0 }}>{label}</div>
-                        <div style={{ flex:1, height:"8px", background:"#F1F5F9", borderRadius:"4px", overflow:"hidden" }}>
-                          <div style={{ height:"100%", width:`${(num/den)*100}%`, background:selectedChild.color, borderRadius:"4px", transition:"width 0.8s ease" }}/>
+                        {/* Mood trend */}
+                        <div style={{ background:"white", borderRadius:"18px", padding:"1.25rem", boxShadow:"0 1px 8px rgba(0,0,0,0.06)" }}>
+                          <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1rem", color:"#0F172A", marginBottom:"1rem" }}>Mood Trend</div>
+                          <ResponsiveContainer width="100%" height={160}>
+                            <LineChart data={chartData} margin={{left:-20,right:8,top:4,bottom:0}}>
+                              <XAxis dataKey="day" tick={{fontFamily:"'Outfit',sans-serif",fontSize:11,fill:"#94A3B8"}} axisLine={false} tickLine={false}/>
+                              <YAxis domain={[0,5]} ticks={[1,3,5]} tick={{fontSize:10,fill:"#CBD5E1"}} axisLine={false} tickLine={false}/>
+                              <Tooltip content={<CustomTooltip/>}/>
+                              <Line type="monotone" dataKey="score" stroke={selectedChild.color} strokeWidth={2.5} dot={{fill:selectedChild.color,r:4,strokeWidth:0}} connectNulls={false}/>
+                            </LineChart>
+                          </ResponsiveContainer>
                         </div>
-                        <div style={{ fontSize:"0.8rem", fontWeight:700, color:selectedChild.color, width:"36px", textAlign:"right" }}>{score.trim()}</div>
+
+                        {/* Wellness radar */}
+                        <div style={{ background:"white", borderRadius:"18px", padding:"1.25rem", boxShadow:"0 1px 8px rgba(0,0,0,0.06)" }}>
+                          <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1rem", color:"#0F172A", marginBottom:"0.5rem" }}>Wellness Profile</div>
+                          <ResponsiveContainer width="100%" height={170}>
+                            <RadarChart data={radarData} margin={{top:0,right:20,bottom:0,left:20}}>
+                              <PolarGrid stroke="#F1F5F9"/>
+                              <PolarAngleAxis dataKey="subject" tick={{fontFamily:"'Outfit',sans-serif",fontSize:10,fill:"#94A3B8"}}/>
+                              <Radar name={selectedChild.name} dataKey="A" stroke={selectedChild.color} fill={selectedChild.color} fillOpacity={0.25} strokeWidth={2}/>
+                            </RadarChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+
+                      {/* AI Clinical Notes */}
+                      <div style={{ background:"white", borderRadius:"18px", padding:"1.25rem", boxShadow:"0 1px 8px rgba(0,0,0,0.06)", marginBottom:"14px" }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"1rem" }}>
+                          <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1rem", color:"#0F172A" }}>
+                            🧠 AI Clinical Notes — {selectedChild.name}
+                          </div>
+                          <div style={{ fontSize:"0.72rem", color:"#94A3B8" }}>Powered by Claude</div>
+                        </div>
+
+                        {aiLoading && !notes && (
+                          <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                            {[120,80,100,80].map((w,i)=>(
+                              <div key={i} style={{ height:"14px", borderRadius:"7px", width:`${w}%`, background:"linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%)", backgroundSize:"400px 100%", animation:"shimmer 1.4s ease infinite", animationDelay:`${i*0.1}s` }}/>
+                            ))}
+                          </div>
+                        )}
+
+                        {notes && !notes.error && (
+                          <div style={{ display:"flex", flexDirection:"column", gap:"14px", animation:"slideIn 0.4s ease" }}>
+                            <div style={{ background:"#F8FAFC", borderRadius:"12px", padding:"12px 16px", fontSize:"0.85rem", color:"#374151", lineHeight:1.6, borderLeft:`3px solid ${selectedChild.color}` }}>
+                              {notes.clinicalSummary}
+                            </div>
+                            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+                              <div>
+                                <div style={{ fontSize:"0.72rem", fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"8px" }}>Observed Patterns</div>
+                                {notes.patterns?.map((p,i)=>(
+                                  <div key={i} style={{ display:"flex", gap:"6px", fontSize:"0.8rem", color:"#475569", marginBottom:"6px", lineHeight:1.4 }}>
+                                    <span style={{ color:selectedChild.color, flexShrink:0 }}>•</span>{p}
+                                  </div>
+                                ))}
+                              </div>
+                              <div>
+                                <div style={{ fontSize:"0.72rem", fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"8px" }}>Recommendations</div>
+                                {notes.recommendations?.map((r,i)=>(
+                                  <div key={i} style={{ display:"flex", gap:"6px", fontSize:"0.8rem", color:"#475569", marginBottom:"6px", lineHeight:1.4 }}>
+                                    <span style={{ color:"#10B981", flexShrink:0 }}>→</span>{r}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {notes.parentTalkingPoints?.length > 0 && (
+                              <div style={{ background:"#EFF6FF", borderRadius:"12px", padding:"12px 16px" }}>
+                                <div style={{ fontSize:"0.72rem", fontWeight:700, color:"#3B82F6", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"8px" }}>Parent Talking Points</div>
+                                {notes.parentTalkingPoints.map((p,i)=>(
+                                  <div key={i} style={{ fontSize:"0.8rem", color:"#1E40AF", marginBottom:"4px", display:"flex", gap:"6px" }}>
+                                    <span>💬</span>{p}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {notes?.error && (
+                          <div style={{ color:"#EF4444", fontSize:"0.85rem" }}>
+                            {selectedChild.sessions.length === 0
+                              ? "No sessions this week to analyze."
+                              : "Couldn't load AI notes."}
+                            {selectedChild.sessions.length > 0 && (
+                              <button onClick={()=>{ setAiNotes(prev=>{ const n={...prev}; delete n[selectedChild.id]; return n; }); fetchAINotes(selectedChild); }} style={{ background:"none", border:"none", color:"#6366F1", cursor:"pointer", fontWeight:700, fontFamily:"'Outfit',sans-serif" }}> Retry</button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* IEP Goals */}
+                      <div style={{ background:"white", borderRadius:"18px", padding:"1.25rem", boxShadow:"0 1px 8px rgba(0,0,0,0.06)" }}>
+                        <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1rem", color:"#0F172A", marginBottom:"1rem" }}>IEP Goal Progress</div>
+                        {selectedChild.iepGoals.length === 0 ? (
+                          <div style={{ color:"#CBD5E1", fontSize:"0.85rem" }}>No IEP goals recorded.</div>
+                        ) : (
+                          <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+                            {selectedChild.iepGoals.map((g,i) => {
+                              const [label, score] = g.split(":");
+                              const [num, den] = score.trim().split("/").map(Number);
+                              return (
+                                <div key={i} style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                                  <div style={{ width:"140px", fontSize:"0.82rem", fontWeight:600, color:"#374151", flexShrink:0 }}>{label}</div>
+                                  <div style={{ flex:1, height:"8px", background:"#F1F5F9", borderRadius:"4px", overflow:"hidden" }}>
+                                    <div style={{ height:"100%", width:`${(num/den)*100}%`, background:selectedChild.color, borderRadius:"4px", transition:"width 0.8s ease" }}/>
+                                  </div>
+                                  <div style={{ fontSize:"0.8rem", fontWeight:700, color:selectedChild.color, width:"36px", textAlign:"right" }}>{score.trim()}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -741,68 +744,80 @@ Return ONLY a JSON object (no markdown) with:
                 <div style={{ fontSize:"0.78rem", color:"#94A3B8", marginTop:"2px" }}>Generate shareable PDF reports for therapy appointments</div>
               </div>
 
-              <div style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
-                {CHILDREN.map((child, i) => {
-                  const avg = (child.sessions.reduce((a,s)=>a+s.stars,0)/child.sessions.length).toFixed(1);
-                  const stress = stressCount(child.sessions);
-                  const topMood = buildMoodBreakdown(child.sessions)[0];
-                  return (
-                    <div key={child.id} style={{
-                      background:"white", borderRadius:"20px", padding:"1.5rem",
-                      boxShadow:"0 2px 12px rgba(0,0,0,0.06)",
-                      animation:`fadeUp 0.4s ease both`, animationDelay:`${i*0.08}s`,
-                      borderLeft:`5px solid ${child.color}`,
-                    }}>
-                      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:"1rem" }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-                          <div style={{ width:"52px", height:"52px", borderRadius:"50%", background:`${child.color}18`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.8rem" }}>
-                            {child.avatar}
+              {childrenLoading ? (
+                <div style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
+                  {[1,2,3].map(i=>(
+                    <div key={i} style={{ height:"120px", borderRadius:"20px", background:"linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%)", backgroundSize:"400px 100%", animation:"shimmer 1.4s ease infinite", animationDelay:`${i*0.1}s` }}/>
+                  ))}
+                </div>
+              ) : children.length === 0 ? (
+                <div style={{ textAlign:"center", padding:"3rem", color:"#CBD5E1" }}>No patients assigned yet.</div>
+              ) : (
+                <div style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
+                  {children.map((child, i) => {
+                    const avg = (child.sessions.reduce((a,s)=>a+s.stars,0)/Math.max(1,child.sessions.length)).toFixed(1);
+                    const stress = stressCount(child.sessions);
+                    const topMood = buildMoodBreakdown(child.sessions)[0];
+                    return (
+                      <div key={child.id} style={{
+                        background:"white", borderRadius:"20px", padding:"1.5rem",
+                        boxShadow:"0 2px 12px rgba(0,0,0,0.06)",
+                        animation:`fadeUp 0.4s ease both`, animationDelay:`${i*0.08}s`,
+                        borderLeft:`5px solid ${child.color}`,
+                      }}>
+                        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:"1rem" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+                            <div style={{ width:"52px", height:"52px", borderRadius:"50%", background:`${child.color}18`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.8rem" }}>
+                              {child.avatar}
+                            </div>
+                            <div>
+                              <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1.2rem", color:"#0F172A" }}>{child.name}</div>
+                              <div style={{ fontSize:"0.78rem", color:"#94A3B8" }}>Age {child.age} · {child.therapist} · Parent: {child.parent}</div>
+                            </div>
                           </div>
-                          <div>
-                            <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1.2rem", color:"#0F172A" }}>{child.name}</div>
-                            <div style={{ fontSize:"0.78rem", color:"#94A3B8" }}>Age {child.age} · {child.therapist} · Parent: {child.parent}</div>
-                          </div>
+                          <button onClick={()=>{ openPDFReport(child); showToast(`Opening ${child.name}'s report…`, child.color); }} style={{
+                            background:child.color, color:"white", border:"none", borderRadius:"12px",
+                            padding:"10px 20px", fontFamily:"'Outfit',sans-serif", fontWeight:700,
+                            fontSize:"0.85rem", cursor:"pointer", boxShadow:`0 4px 14px ${child.color}44`,
+                            flexShrink:0, transition:"all 0.15s",
+                          }}>
+                            📄 Generate Report
+                          </button>
                         </div>
-                        <button onClick={()=>{ openPDFReport(child); showToast(`Opening ${child.name}'s report…`, child.color); }} style={{
-                          background:child.color, color:"white", border:"none", borderRadius:"12px",
-                          padding:"10px 20px", fontFamily:"'Outfit',sans-serif", fontWeight:700,
-                          fontSize:"0.85rem", cursor:"pointer", boxShadow:`0 4px 14px ${child.color}44`,
-                          flexShrink:0, transition:"all 0.15s",
-                        }}>
-                          📄 Generate Report
-                        </button>
-                      </div>
 
-                      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"10px", marginTop:"1.25rem" }}>
-                        {[
-                          { label:"Sessions",     value:child.sessions.length, color:child.color },
-                          { label:"Avg Stars",    value:`${avg}/3`,            color:"#F59E0B"   },
-                          { label:"Top Mood",     value:`${topMood?.emoji} ${topMood?.label}`, color:topMood?.color },
-                          { label:"Stress Events",value:stress,                color: stress>=4?"#EF4444":"#10B981" },
-                        ].map(s=>(
-                          <div key={s.label} style={{ background:"#F8FAFC", borderRadius:"10px", padding:"10px 12px" }}>
-                            <div style={{ fontSize:"1.1rem", fontWeight:800, color:s.color }}>{s.value}</div>
-                            <div style={{ fontSize:"0.7rem", color:"#94A3B8", marginTop:"2px" }}>{s.label}</div>
+                        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"10px", marginTop:"1.25rem" }}>
+                          {[
+                            { label:"Sessions",     value:child.sessions.length, color:child.color },
+                            { label:"Avg Stars",    value:`${avg}/3`,            color:"#F59E0B"   },
+                            { label:"Top Mood",     value:`${topMood?.emoji ?? "😊"} ${topMood?.label ?? "—"}`, color:topMood?.color ?? "#6366F1" },
+                            { label:"Stress Events",value:stress,                color: stress>=4?"#EF4444":"#10B981" },
+                          ].map(s=>(
+                            <div key={s.label} style={{ background:"#F8FAFC", borderRadius:"10px", padding:"10px 12px" }}>
+                              <div style={{ fontSize:"1.1rem", fontWeight:800, color:s.color }}>{s.value}</div>
+                              <div style={{ fontSize:"0.7rem", color:"#94A3B8", marginTop:"2px" }}>{s.label}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {child.notes && (
+                          <div style={{ marginTop:"1rem", background:"#F8FAFC", borderRadius:"10px", padding:"10px 14px", fontSize:"0.8rem", color:"#475569", lineHeight:1.5 }}>
+                            📝 {child.notes}
                           </div>
-                        ))}
-                      </div>
+                        )}
 
-                      <div style={{ marginTop:"1rem", background:"#F8FAFC", borderRadius:"10px", padding:"10px 14px", fontSize:"0.8rem", color:"#475569", lineHeight:1.5 }}>
-                        📝 {child.notes}
+                        <div style={{ marginTop:"1rem", display:"flex", gap:"8px", flexWrap:"wrap" }}>
+                          <span style={{ fontSize:"0.72rem", color:"#94A3B8" }}>Report includes:</span>
+                          {["Summary stats","Mood distribution","Session log","IEP progress","Clinical observations","Therapist notes"].map(tag=>(
+                            <span key={tag} style={{ background:"#EEF2FF", color:"#6366F1", borderRadius:"20px", padding:"2px 9px", fontSize:"0.7rem", fontWeight:600 }}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-
-                      <div style={{ marginTop:"1rem", display:"flex", gap:"8px", flexWrap:"wrap" }}>
-                        <span style={{ fontSize:"0.72rem", color:"#94A3B8" }}>Report includes:</span>
-                        {["Summary stats","Mood distribution","Session log","IEP progress","Clinical observations","Therapist notes"].map(tag=>(
-                          <span key={tag} style={{ background:"#EEF2FF", color:"#6366F1", borderRadius:"20px", padding:"2px 9px", fontSize:"0.7rem", fontWeight:600 }}>
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Report format info */}
               <div style={{ marginTop:"1.5rem", background:"linear-gradient(135deg,#4F46E5,#7C3AED)", borderRadius:"18px", padding:"1.5rem", color:"white" }}>

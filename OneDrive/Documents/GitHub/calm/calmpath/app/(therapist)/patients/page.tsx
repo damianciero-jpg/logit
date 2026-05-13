@@ -1,12 +1,7 @@
-// Phase 4: wire calmpath-full.jsx therapist view here
+'use client'
+
+import CalmPathApp from '@/components/calmpath-full'
+
 export default function PatientsPage() {
-  return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🩺</div>
-        <h1 style={{ fontSize: '1.25rem', color: '#0F172A' }}>Therapist Dashboard</h1>
-        <p style={{ color: '#94A3B8', marginTop: '0.5rem' }}>Coming in Phase 4</p>
-      </div>
-    </div>
-  )
+  return <CalmPathApp />
 }

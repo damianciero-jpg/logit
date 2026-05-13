@@ -1,24 +1,6 @@
 import { useState, useEffect } from "react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
-
-// ── Simulated session data (in production this comes from MoodQuest game logs) ──
-const MOCK_SESSIONS = [
-  { date: "Mon", mood: "happy", stars: 3, time: "3:45 PM", game: "Star Collector", world: "Sunshine Meadow" },
-  { date: "Mon", mood: "calm", stars: 3, time: "4:10 PM", game: "Bubble Breath", world: "Whispering Forest" },
-  { date: "Tue", mood: "anxious", stars: 2, time: "8:12 AM", game: "Cloud Catcher", world: "Cloudy Cove" },
-  { date: "Tue", mood: "angry", stars: 1, time: "3:55 PM", game: "Volcano Stomp", world: "Volcano Valley" },
-  { date: "Tue", mood: "anxious", stars: 2, time: "5:30 PM", game: "Cloud Catcher", world: "Cloudy Cove" },
-  { date: "Wed", mood: "happy", stars: 3, time: "9:00 AM", game: "Star Collector", world: "Sunshine Meadow" },
-  { date: "Wed", mood: "calm", stars: 3, time: "2:20 PM", game: "Bubble Breath", world: "Whispering Forest" },
-  { date: "Thu", mood: "sad", stars: 2, time: "7:45 AM", game: "Rainbow Painter", world: "Rainy Rainbow" },
-  { date: "Thu", mood: "tired", stars: 1, time: "3:30 PM", game: "Dream Catch", world: "Sleepy Clouds" },
-  { date: "Thu", mood: "angry", stars: 2, time: "6:00 PM", game: "Volcano Stomp", world: "Volcano Valley" },
-  { date: "Fri", mood: "happy", stars: 3, time: "8:30 AM", game: "Star Collector", world: "Sunshine Meadow" },
-  { date: "Fri", mood: "calm", stars: 3, time: "4:00 PM", game: "Bubble Breath", world: "Whispering Forest" },
-  { date: "Sat", mood: "happy", stars: 3, time: "10:15 AM", game: "Star Collector", world: "Sunshine Meadow" },
-  { date: "Sat", mood: "happy", stars: 3, time: "2:00 PM", game: "Star Collector", world: "Sunshine Meadow" },
-  { date: "Sun", mood: "calm", stars: 3, time: "11:00 AM", game: "Bubble Breath", world: "Whispering Forest" },
-];
+import { createClient } from "@/lib/supabase";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const MOOD_META = {
   happy:   { emoji: "😄", label: "Happy",      color: "#F59E0B", light: "#FEF3C7" },
@@ -51,6 +33,51 @@ function buildMoodBreakdown(sessions) {
   return Object.entries(counts).map(([mood, value]) => ({
     mood, value, ...MOOD_META[mood],
   })).sort((a, b) => b.value - a.value);
+}
+
+function buildWeekAtAGlance(sessions) {
+  if (!sessions.length) return [
+    { label: "Best Day",     value: "—", sub: "No sessions yet" },
+    { label: "Toughest Day", value: "—", sub: "No sessions yet" },
+    { label: "Best Time",    value: "—", sub: "No sessions yet" },
+  ];
+
+  const dayScores = {};
+  sessions.forEach((s) => {
+    if (!dayScores[s.date]) dayScores[s.date] = [];
+    dayScores[s.date].push(moodScore(s.mood));
+  });
+  const bestDay = Object.entries(dayScores)
+    .map(([day, scores]) => ({ day, avg: scores.reduce((a, b) => a + b, 0) / scores.length }))
+    .sort((a, b) => b.avg - a.avg)[0];
+
+  const dayStress = {};
+  sessions
+    .filter((s) => ["anxious", "angry", "sad"].includes(s.mood))
+    .forEach((s) => { dayStress[s.date] = (dayStress[s.date] || 0) + 1; });
+  const toughDay = Object.entries(dayStress).sort((a, b) => b[1] - a[1])[0];
+
+  const score = (list) => list.length ? list.reduce((a, b) => a + b, 0) / list.length : 0;
+  const morningAvg = score(sessions.filter((s) => !s.time.includes("PM") || s.time.startsWith("12:")).map((s) => moodScore(s.mood)));
+  const afternoonAvg = score(sessions.filter((s) => s.time.includes("PM") && !s.time.startsWith("12:")).map((s) => moodScore(s.mood)));
+  const bestTime = morningAvg >= afternoonAvg ? "Morning" : "Afternoon";
+
+  return [
+    { label: "Best Day",     value: bestDay?.day ?? "—",  sub: bestDay ? `Avg score ${bestDay.avg.toFixed(1)}/5` : "No data" },
+    { label: "Toughest Day", value: toughDay?.[0] ?? "—", sub: toughDay ? `${toughDay[1]} stress event${toughDay[1] > 1 ? "s" : ""}` : "No stress events" },
+    { label: "Best Time",    value: bestTime,               sub: `Avg mood ${Math.max(morningAvg, afternoonAvg).toFixed(1)}/5` },
+  ];
+}
+
+function dbRowToSession(s) {
+  return {
+    date:  s.day_label,
+    mood:  s.mood,
+    stars: s.stars,
+    game:  s.game,
+    world: s.world ?? "",
+    time:  new Date(s.played_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+  };
 }
 
 function StatCard({ icon, label, value, sub, color, delay }) {
@@ -119,62 +146,65 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-export default function CalmPathDashboard() {
+export default function CalmPathDashboard({
+  childId    = null,
+  childName  = "Your Child",
+  childAge   = null,
+  childAvatar = "👦",
+  childColor  = "#6366F1",
+}) {
   const [tab, setTab] = useState("overview");
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
   const [aiInsights, setAiInsights] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
 
-  const chartData = buildChartData(MOCK_SESSIONS);
-  const moodBreakdown = buildMoodBreakdown(MOCK_SESSIONS);
-  const totalSessions = MOCK_SESSIONS.length;
-  const avgStars = (MOCK_SESSIONS.reduce((a, s) => a + s.stars, 0) / totalSessions).toFixed(1);
-  const topMood = moodBreakdown[0];
-  const stressEvents = MOCK_SESSIONS.filter((s) => ["anxious", "angry", "sad"].includes(s.mood)).length;
+  useEffect(() => {
+    if (!childId) { setSessionsLoading(false); return; }
+    const supabase = createClient();
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    supabase
+      .from("sessions")
+      .select("*")
+      .eq("child_id", childId)
+      .gte("played_at", weekAgo.toISOString())
+      .order("played_at", { ascending: true })
+      .then(({ data }) => {
+        if (data) setSessions(data.map(dbRowToSession));
+        setSessionsLoading(false);
+      });
+  }, [childId]);
 
-  const dayDetail = selectedDay
-    ? MOCK_SESSIONS.filter((s) => s.date === selectedDay)
-    : [];
+  const chartData     = buildChartData(sessions);
+  const moodBreakdown = buildMoodBreakdown(sessions);
+  const totalSessions = sessions.length;
+  const avgStars      = totalSessions > 0
+    ? (sessions.reduce((a, s) => a + s.stars, 0) / totalSessions).toFixed(1)
+    : "0.0";
+  const topMood       = moodBreakdown[0];
+  const dayDetail     = selectedDay ? sessions.filter((s) => s.date === selectedDay) : [];
+  const weekGlance    = buildWeekAtAGlance(sessions);
 
   const fetchAIInsights = async () => {
+    if (!sessions.length) {
+      setAiError("No sessions yet this week to analyze.");
+      return;
+    }
     setAiLoading(true);
     setAiError(null);
     try {
-      const summary = MOCK_SESSIONS.map(
-        (s) => `${s.date} ${s.time}: mood=${s.mood}, stars=${s.stars}, game=${s.game}`
-      ).join("\n");
-
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/ai-insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: `You are a compassionate child behavior analyst helping parents of children with autism understand their child's emotional patterns.
-
-Here is one week of mood and game data from the child's MoodQuest app:
-
-${summary}
-
-Analyze this data and return ONLY a JSON array (no markdown, no preamble) with 4 insight objects. Each object must have:
-- "type": one of "positive", "warning", or "info"
-- "title": short headline (max 8 words)
-- "body": 1-2 sentences of warm, helpful, parent-friendly insight
-
-Focus on: time-of-day patterns, day-of-week trends, mood sequences, and actionable suggestions. Be warm and supportive, never alarming.`
-          }],
-        }),
+        body: JSON.stringify({ sessions, mode: "parent" }),
       });
-
-      const data = await response.json();
-      const text = data.content?.find((b) => b.type === "text")?.text || "[]";
-      const clean = text.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(clean);
-      setAiInsights(parsed);
-    } catch (err) {
+      const { data, error } = await res.json();
+      if (error) throw new Error(error);
+      setAiInsights(data);
+    } catch {
       setAiError("Couldn't load insights right now. Try again shortly.");
     } finally {
       setAiLoading(false);
@@ -182,10 +212,10 @@ Focus on: time-of-day patterns, day-of-week trends, mood sequences, and actionab
   };
 
   useEffect(() => {
-    if (tab === "insights" && aiInsights.length === 0) {
+    if (tab === "insights" && aiInsights.length === 0 && !sessionsLoading) {
       fetchAIInsights();
     }
-  }, [tab]);
+  }, [tab, sessionsLoading]);
 
   const tabs = [
     { id: "overview", label: "Overview", icon: "📊" },
@@ -246,15 +276,20 @@ Focus on: time-of-day patterns, day-of-week trends, mood sequences, and actionab
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#0F172A" }}>Jordan, age 8</div>
-                <div style={{ fontSize: "0.72rem", color: "#94A3B8" }}>This week · 15 sessions</div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#0F172A" }}>
+                  {childName}{childAge ? `, age ${childAge}` : ""}
+                </div>
+                <div style={{ fontSize: "0.72rem", color: "#94A3B8" }}>
+                  This week · {sessionsLoading ? "…" : `${totalSessions} sessions`}
+                </div>
               </div>
               <div style={{
                 width: "38px", height: "38px", borderRadius: "50%",
-                background: "linear-gradient(135deg, #FDE68A, #F59E0B)",
+                background: `${childColor}28`,
+                border: `2px solid ${childColor}55`,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "1.3rem", boxShadow: "0 2px 8px rgba(245,158,11,0.3)",
-              }}>👦</div>
+                fontSize: "1.3rem",
+              }}>{childAvatar}</div>
             </div>
           </div>
         </div>
@@ -298,10 +333,10 @@ Focus on: time-of-day patterns, day-of-week trends, mood sequences, and actionab
 
               {/* Stat cards */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "1.5rem" }}>
-                <StatCard icon="🎮" label="Sessions" value={totalSessions} sub="This week" color="#6366F1" delay="0s" />
-                <StatCard icon="⭐" label="Avg Stars" value={avgStars} sub="Out of 3.0" color="#F59E0B" delay="0.08s" />
-                <StatCard icon={topMood?.emoji} label="Top Mood" value={topMood?.label} sub={`${topMood?.value} times`} color={topMood?.color} delay="0.16s" />
-                <StatCard icon="💛" label="Calm Days" value={`${MOCK_SESSIONS.filter(s => ["happy","calm"].includes(s.mood)).length}`} sub="Happy/Calm logs" color="#10B981" delay="0.24s" />
+                <StatCard icon="🎮" label="Sessions" value={sessionsLoading ? "…" : totalSessions} sub="This week" color="#6366F1" delay="0s" />
+                <StatCard icon="⭐" label="Avg Stars" value={sessionsLoading ? "…" : avgStars} sub="Out of 3.0" color="#F59E0B" delay="0.08s" />
+                <StatCard icon={topMood?.emoji ?? "😊"} label="Top Mood" value={topMood?.label ?? "—"} sub={topMood ? `${topMood.value} times` : "No data"} color={topMood?.color ?? "#6366F1"} delay="0.16s" />
+                <StatCard icon="💛" label="Calm Days" value={sessionsLoading ? "…" : sessions.filter(s => ["happy","calm"].includes(s.mood)).length} sub="Happy/Calm logs" color="#10B981" delay="0.24s" />
               </div>
 
               {/* Mood trend chart */}
@@ -344,27 +379,31 @@ Focus on: time-of-day patterns, day-of-week trends, mood sequences, and actionab
                   <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.1rem", color: "#0F172A", marginBottom: "1rem" }}>
                     Mood Breakdown
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    {moodBreakdown.map((m) => (
-                      <div key={m.mood} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "1.1rem", width: "24px" }}>{m.emoji}</span>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
-                            <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#374151" }}>{m.label}</span>
-                            <span style={{ fontSize: "0.78rem", color: "#94A3B8" }}>{m.value}x</span>
-                          </div>
-                          <div style={{ height: "6px", background: "#F1F5F9", borderRadius: "3px", overflow: "hidden" }}>
-                            <div style={{
-                              height: "100%", borderRadius: "3px",
-                              width: `${(m.value / totalSessions) * 100}%`,
-                              background: m.color,
-                              transition: "width 0.8s ease",
-                            }} />
+                  {moodBreakdown.length === 0 ? (
+                    <div style={{ color: "#CBD5E1", fontSize: "0.85rem", textAlign: "center", padding: "1rem 0" }}>No sessions this week</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {moodBreakdown.map((m) => (
+                        <div key={m.mood} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "1.1rem", width: "24px" }}>{m.emoji}</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                              <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#374151" }}>{m.label}</span>
+                              <span style={{ fontSize: "0.78rem", color: "#94A3B8" }}>{m.value}x</span>
+                            </div>
+                            <div style={{ height: "6px", background: "#F1F5F9", borderRadius: "3px", overflow: "hidden" }}>
+                              <div style={{
+                                height: "100%", borderRadius: "3px",
+                                width: `${(m.value / totalSessions) * 100}%`,
+                                background: m.color,
+                                transition: "width 0.8s ease",
+                              }} />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Day selector detail */}
@@ -374,7 +413,7 @@ Focus on: time-of-day patterns, day-of-week trends, mood sequences, and actionab
                   </div>
                   <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "1rem" }}>
                     {DAYS.map((d) => {
-                      const hasData = MOCK_SESSIONS.some((s) => s.date === d);
+                      const hasData = sessions.some((s) => s.date === d);
                       return (
                         <button
                           key={d}
@@ -488,11 +527,7 @@ Focus on: time-of-day patterns, day-of-week trends, mood sequences, and actionab
                   📅 Week at a Glance
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
-                  {[
-                    { label: "Best Day", value: "Saturday", sub: "2 happy sessions" },
-                    { label: "Toughest Day", value: "Tuesday", sub: "3 stress events" },
-                    { label: "Best Time", value: "Morning", sub: "Higher scores before noon" },
-                  ].map((item) => (
+                  {weekGlance.map((item) => (
                     <div key={item.label} style={{ background: "rgba(255,255,255,0.12)", borderRadius: "12px", padding: "10px 12px" }}>
                       <div style={{ fontSize: "0.7rem", opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "3px" }}>{item.label}</div>
                       <div style={{ fontWeight: 800, fontSize: "0.95rem" }}>{item.value}</div>
@@ -510,51 +545,57 @@ Focus on: time-of-day patterns, day-of-week trends, mood sequences, and actionab
               <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.4rem", color: "#0F172A", marginBottom: "1.25rem" }}>
                 Session Log
               </div>
-              <div style={{ background: "white", borderRadius: "20px", overflow: "hidden", boxShadow: "0 2px 16px rgba(15,23,42,0.06)" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 100px", padding: "10px 20px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
-                  {["Day", "Mood", "Game", "Stars"].map((h) => (
-                    <div key={h} style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</div>
-                  ))}
+              {sessions.length === 0 ? (
+                <div style={{ background: "white", borderRadius: "20px", padding: "3rem", textAlign: "center", color: "#CBD5E1", boxShadow: "0 2px 16px rgba(15,23,42,0.06)" }}>
+                  {sessionsLoading ? "Loading sessions…" : "No sessions this week yet."}
                 </div>
-                {[...MOCK_SESSIONS].reverse().map((s, i) => {
-                  const m = MOOD_META[s.mood];
-                  return (
-                    <div
-                      key={i}
-                      className="log-row"
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "80px 1fr 1fr 100px",
-                        padding: "12px 20px",
-                        borderBottom: i < MOCK_SESSIONS.length - 1 ? "1px solid #F1F5F9" : "none",
-                        alignItems: "center",
-                        transition: "background 0.15s",
-                        animation: "fadeUp 0.4s ease both",
-                        animationDelay: `${i * 0.03}s`,
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#1E293B" }}>{s.date}</div>
-                        <div style={{ fontSize: "0.72rem", color: "#94A3B8" }}>{s.time}</div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <div style={{
-                          background: m.light, borderRadius: "20px",
-                          padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: "4px",
-                        }}>
-                          <span style={{ fontSize: "0.85rem" }}>{m.emoji}</span>
-                          <span style={{ fontSize: "0.78rem", fontWeight: 700, color: m.color }}>{m.label}</span>
+              ) : (
+                <div style={{ background: "white", borderRadius: "20px", overflow: "hidden", boxShadow: "0 2px 16px rgba(15,23,42,0.06)" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 100px", padding: "10px 20px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+                    {["Day", "Mood", "Game", "Stars"].map((h) => (
+                      <div key={h} style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</div>
+                    ))}
+                  </div>
+                  {[...sessions].reverse().map((s, i) => {
+                    const m = MOOD_META[s.mood];
+                    return (
+                      <div
+                        key={i}
+                        className="log-row"
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "80px 1fr 1fr 100px",
+                          padding: "12px 20px",
+                          borderBottom: i < sessions.length - 1 ? "1px solid #F1F5F9" : "none",
+                          alignItems: "center",
+                          transition: "background 0.15s",
+                          animation: "fadeUp 0.4s ease both",
+                          animationDelay: `${i * 0.03}s`,
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#1E293B" }}>{s.date}</div>
+                          <div style={{ fontSize: "0.72rem", color: "#94A3B8" }}>{s.time}</div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <div style={{
+                            background: m.light, borderRadius: "20px",
+                            padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: "4px",
+                          }}>
+                            <span style={{ fontSize: "0.85rem" }}>{m.emoji}</span>
+                            <span style={{ fontSize: "0.78rem", fontWeight: 700, color: m.color }}>{m.label}</span>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: "0.82rem", color: "#475569" }}>{s.game}</div>
+                        <div style={{ fontSize: "0.85rem" }}>
+                          {"⭐".repeat(s.stars)}
+                          <span style={{ color: "#E2E8F0" }}>{"☆".repeat(3 - s.stars)}</span>
                         </div>
                       </div>
-                      <div style={{ fontSize: "0.82rem", color: "#475569" }}>{s.game}</div>
-                      <div style={{ fontSize: "0.85rem" }}>
-                        {"⭐".repeat(s.stars)}
-                        <span style={{ color: "#E2E8F0" }}>{"☆".repeat(3 - s.stars)}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
