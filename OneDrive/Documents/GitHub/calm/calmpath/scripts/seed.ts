@@ -152,6 +152,19 @@ async function seed() {
   const parentId    = await getOrCreateUser(PARENT_EMAIL,    'Lisa Mitchell', 'parent')
   const therapistId = await getOrCreateUser(THERAPIST_EMAIL, 'Dr. Chen',      'therapist')
 
+  // 1b. Ensure profiles exist — handles users created before the DB trigger was installed
+  console.log('\nEnsuring profiles…')
+  const { error: pe1 } = await supabase.from('profiles').upsert(
+    { id: parentId,    role: 'parent',    full_name: 'Lisa Mitchell' },
+    { onConflict: 'id' }
+  )
+  ok('Parent profile', pe1)
+  const { error: pe2 } = await supabase.from('profiles').upsert(
+    { id: therapistId, role: 'therapist', full_name: 'Dr. Chen' },
+    { onConflict: 'id' }
+  )
+  ok('Therapist profile', pe2)
+
   // 2. Clear existing seed children for idempotency
   console.log('\nClearing previous seed children…')
   await supabase.from('children').delete().eq('parent_id', parentId)
