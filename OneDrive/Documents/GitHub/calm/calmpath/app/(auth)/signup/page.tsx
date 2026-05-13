@@ -37,15 +37,7 @@ export default function SignupPage() {
       return
     }
 
-    // Attempt to create profiles row — succeeds once Phase 2 table exists
-    if (data.user) {
-      await supabase.from('profiles').insert({
-        id: data.user.id,
-        role,
-        full_name: fullName,
-      })
-    }
-
+    // Profile row is auto-created by DB trigger (handle_new_user) on auth.users INSERT
     // If email confirmation is disabled in Supabase, user is already logged in
     if (data.session) {
       router.push(role === 'therapist' ? '/patients' : '/dashboard')
