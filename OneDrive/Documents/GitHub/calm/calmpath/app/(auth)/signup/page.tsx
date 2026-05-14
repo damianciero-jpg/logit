@@ -40,6 +40,7 @@ export default function SignupPage() {
     // Profile row is auto-created by DB trigger (handle_new_user) on auth.users INSERT
     // If email confirmation is disabled in Supabase, user is already logged in
     if (data.session) {
+      router.refresh()
       router.push(role === 'therapist' ? '/patients' : '/dashboard')
     } else {
       setEmailSent(true)

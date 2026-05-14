@@ -27,6 +27,7 @@ export default function LoginPage() {
     }
 
     const role = data.user?.user_metadata?.role
+    router.refresh()
     if (role === 'therapist') {
       router.push('/patients')
     } else {
