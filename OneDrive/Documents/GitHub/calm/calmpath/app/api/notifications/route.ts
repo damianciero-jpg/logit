@@ -3,24 +3,21 @@ import { createClient } from '@supabase/supabase-js'
 
 export const maxDuration = 15
 
-const service = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
-
 const STRESS = ['anxious', 'angry', 'sad']
 
 type Session = { mood: string; stars: number; played_at: string; day_label: string }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ServiceClient = any
 
 async function alreadyNotified(
+  svc: ServiceClient,
   childId: string,
   type: string,
   since: Date,
   titleContains?: string
 ): Promise<boolean> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = service
+  let q: any = svc
     .from('notifications')
     .select('id', { count: 'exact', head: true })
     .eq('child_id', childId)
@@ -32,6 +29,7 @@ async function alreadyNotified(
 }
 
 async function insertNotifs(
+  svc: ServiceClient,
   recipientIds: string[],
   childId: string,
   type: string,
@@ -40,12 +38,17 @@ async function insertNotifs(
 ): Promise<number> {
   if (!recipientIds.length) return 0
   const rows = recipientIds.map(recipient_id => ({ recipient_id, child_id: childId, type, title, body }))
-  const { error } = await service.from('notifications').insert(rows)
+  const { error } = await svc.from('notifications').insert(rows)
   if (error) console.error('notif insert:', error.message)
   return error ? 0 : rows.length
 }
 
 export async function POST(request: NextRequest) {
+  const service = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
   try {
     const raw = await request.json().catch(() => ({}))
     // Support MoodQuest format { childId } and Supabase webhook format { record: { child_id } }
@@ -84,9 +87,9 @@ export async function POST(request: NextRequest) {
     // ── Rule 1: 3+ stress sessions today ────────────────────────
     const stressToday = today.filter(s => STRESS.includes(s.mood))
     if (stressToday.length >= 3) {
-      if (!(await alreadyNotified(childId, 'alert', todayUTC))) {
+      if (!(await alreadyNotified(service, childId, 'alert', todayUTC))) {
         created += await insertNotifs(
-          recipients, childId, 'alert',
+          service, recipients, childId, 'alert',
           `${child.name} had ${stressToday.length} stress sessions today`,
           'Elevated frustration and worry patterns detected. Consider checking in with your child.'
         )
@@ -103,9 +106,9 @@ export async function POST(request: NextRequest) {
       ),
     ]
     if (monStressDates.length >= 2) {
-      if (!(await alreadyNotified(childId, 'pattern', weekStartUTC, 'Monday'))) {
+      if (!(await alreadyNotified(service, childId, 'pattern', weekStartUTC, 'Monday'))) {
         created += await insertNotifs(
-          recipients, childId, 'pattern',
+          service, recipients, childId, 'pattern',
           `Monday morning stress pattern — ${child.name}`,
           `Stress sessions detected on ${monStressDates.length} Monday mornings in the past 4 weeks. May align with school start-of-week anxiety.`
         )
@@ -122,9 +125,9 @@ export async function POST(request: NextRequest) {
       ),
     ]
     if (thuStressDates.length >= 2) {
-      if (!(await alreadyNotified(childId, 'pattern', weekStartUTC, 'Thursday'))) {
+      if (!(await alreadyNotified(service, childId, 'pattern', weekStartUTC, 'Thursday'))) {
         created += await insertNotifs(
-          recipients, childId, 'pattern',
+          service, recipients, childId, 'pattern',
           `Thursday afternoon trend — ${child.name}`,
           `Frustrated mood logged on ${thuStressDates.length} Thursday afternoons in the past 4 weeks. May be post-school fatigue.`
         )
@@ -135,9 +138,9 @@ export async function POST(request: NextRequest) {
     if (week.length >= 5) {
       const avgStars = week.reduce((a, s) => a + s.stars, 0) / week.length
       if (avgStars >= 2.5) {
-        if (!(await alreadyNotified(childId, 'positive', weekStartUTC))) {
+        if (!(await alreadyNotified(service, childId, 'positive', weekStartUTC))) {
           created += await insertNotifs(
-            recipients, childId, 'positive',
+            service, recipients, childId, 'positive',
             `Great week for ${child.name}! 🌟`,
             `Average of ${avgStars.toFixed(1)} stars across ${week.length} sessions. Excellent emotional regulation this week!`
           )
