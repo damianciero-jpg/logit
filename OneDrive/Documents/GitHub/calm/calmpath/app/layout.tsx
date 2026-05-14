@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CalmPath — AI-Powered Autism Support",
+  title: "Viada — AI-Powered Autism Support",
   description: "Bridging the gap between a child's emotional world and their caregiving team.",
 };
 

@@ -269,7 +269,7 @@ export default function CalmPathDashboard({
               }}>🧩</div>
               <div>
                 <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.3rem", fontWeight: 700, color: "#0F172A", lineHeight: 1 }}>
-                  CalmPath
+                  Viada
                 </div>
                 <div style={{ fontSize: "0.7rem", color: "#94A3B8", fontWeight: 500 }}>Parent Dashboard</div>
               </div>

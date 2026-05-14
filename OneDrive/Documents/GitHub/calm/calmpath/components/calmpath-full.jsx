@@ -90,7 +90,7 @@ function openPDFReport(child) {
 <html>
 <head>
 <meta charset="UTF-8"/>
-<title>CalmPath Report — ${child.name}</title>
+<title>Viada Report — ${child.name}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;600;700&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -127,7 +127,7 @@ function openPDFReport(child) {
 
 <div class="header">
   <div>
-    <div class="brand">🧩 CalmPath</div>
+    <div class="brand">🧩 Viada</div>
     <div class="sub">Therapy Progress Report · Generated ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
   </div>
   <div class="child-info">
@@ -197,7 +197,7 @@ function openPDFReport(child) {
 </div>
 
 <div class="footer">
-  CalmPath · Confidential Therapy Progress Report · ${child.name} · Do not distribute without parental consent
+  Viada · Confidential Therapy Progress Report · ${child.name} · Do not distribute without parental consent
 </div>
 </body>
 </html>`;
@@ -433,7 +433,7 @@ export default function CalmPathApp() {
             <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
               <div style={{ width:"36px", height:"36px", borderRadius:"10px", background:"linear-gradient(135deg,#6366F1,#8B5CF6)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.1rem" }}>🧩</div>
               <div>
-                <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1.25rem", color:"#0F172A", lineHeight:1 }}>CalmPath</div>
+                <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1.25rem", color:"#0F172A", lineHeight:1 }}>Viada</div>
                 <div style={{ fontSize:"0.65rem", color:"#94A3B8", fontWeight:500 }}>Professional Suite</div>
               </div>
             </div>
@@ -821,7 +821,7 @@ export default function CalmPathApp() {
 
               {/* Report format info */}
               <div style={{ marginTop:"1.5rem", background:"linear-gradient(135deg,#4F46E5,#7C3AED)", borderRadius:"18px", padding:"1.5rem", color:"white" }}>
-                <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1.1rem", marginBottom:"0.75rem" }}>📋 About CalmPath Reports</div>
+                <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:"1.1rem", marginBottom:"0.75rem" }}>📋 About Viada Reports</div>
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"12px" }}>
                   {[
                     { icon:"🖨️", label:"Print Ready",     sub:"Optimized for A4 / Letter" },

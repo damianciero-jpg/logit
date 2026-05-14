@@ -1,5 +1,5 @@
 /**
- * CalmPath seed script — Phase 2
+ * Viada seed script — Phase 2
  * Run AFTER applying supabase/schema.sql in Supabase Studio.
  *
  *   npm run seed
@@ -145,7 +145,7 @@ function ok(label: string, error: unknown) {
 
 // ── Main ──────────────────────────────────────────────────────
 async function seed() {
-  console.log('\n🌱 CalmPath seed script\n')
+  console.log('\n🌱 Viada seed script\n')
 
   // 1. Create test users (trigger auto-creates profiles)
   console.log('Creating test users…')
