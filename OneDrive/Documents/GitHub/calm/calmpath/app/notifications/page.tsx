@@ -51,7 +51,7 @@ export default function NotificationsPage() {
         .eq('recipient_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(50)
-      setNotifs((data ?? []) as Notification[])
+      setNotifs((data ?? []) as unknown as Notification[])
       setLoading(false)
     })
   }, [router])
