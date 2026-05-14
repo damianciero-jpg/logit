@@ -147,11 +147,12 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function CalmPathDashboard({
-  childId    = null,
-  childName  = "Your Child",
-  childAge   = null,
-  childAvatar = "👦",
-  childColor  = "#6366F1",
+  childId      = null,
+  childName    = "Your Child",
+  childAge     = null,
+  childAvatar  = "👦",
+  childColor   = "#6366F1",
+  childGameMode = "kids",
 }) {
   const [tab, setTab] = useState("overview");
   const [sessions, setSessions] = useState([]);
@@ -331,17 +332,28 @@ export default function CalmPathDashboard({
           {tab === "overview" && (
             <div style={{ animation: "fadeUp 0.4s ease" }}>
 
-              {/* Play MoodQuest CTA */}
+              {/* Play CTA */}
               <div style={{ background: `linear-gradient(135deg, ${childColor}22, ${childColor}0d)`, border: `1.5px solid ${childColor}44`, borderRadius: "20px", padding: "1.25rem 1.5rem", marginBottom: "1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
                 <div>
-                  <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.1rem", color: "#0F172A" }}>Ready to play?</div>
-                  <div style={{ fontSize: "0.8rem", color: "#64748B", marginTop: "3px" }}>Launch MoodQuest for {childName} — each session logs their mood automatically.</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px" }}>
+                    <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.1rem", color: "#0F172A" }}>Ready to play?</div>
+                    <span style={{ fontSize: "0.7rem", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", background: childGameMode === "teen" ? "#1E1B4B" : `${childColor}22`, color: childGameMode === "teen" ? "#A5B4FC" : childColor }}>
+                      {childGameMode === "teen" ? "🌙 Teen Mode" : "🎮 Kids Mode"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "0.8rem", color: "#64748B" }}>
+                    {childGameMode === "teen"
+                      ? `Launch ${childName}'s teen check-in — mindfulness and reflection.`
+                      : `Launch MoodQuest for ${childName} — each session logs their mood automatically.`}
+                    {" "}
+                    <a href="/settings" style={{ color: childColor, fontWeight: 600, textDecoration: "none" }}>Switch mode</a>
+                  </div>
                 </div>
                 <a
-                  href={`/play?childId=${childId}`}
-                  style={{ padding: "10px 22px", borderRadius: "12px", background: childColor, color: "white", fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: "0.9rem", textDecoration: "none", display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap", flexShrink: 0 }}
+                  href={childGameMode === "teen" ? `/play-teen?childId=${childId}` : `/play?childId=${childId}`}
+                  style={{ padding: "10px 22px", borderRadius: "12px", background: childGameMode === "teen" ? "#312E81" : childColor, color: "white", fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: "0.9rem", textDecoration: "none", display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap", flexShrink: 0 }}
                 >
-                  Play MoodQuest 🎮
+                  {childGameMode === "teen" ? "Start Check-in 🌙" : "Play MoodQuest 🎮"}
                 </a>
               </div>
 

@@ -39,6 +39,7 @@ export interface Database {
           color: string
           therapist_id: string | null
           created_at: string
+          game_mode: 'kids' | 'teen' | null
         }
         Insert: {
           id?: string
@@ -49,6 +50,7 @@ export interface Database {
           color?: string
           therapist_id?: string | null
           created_at?: string
+          game_mode?: 'kids' | 'teen'
         }
         Update: {
           name?: string
@@ -56,6 +58,7 @@ export interface Database {
           avatar?: string
           color?: string
           therapist_id?: string | null
+          game_mode?: 'kids' | 'teen'
         }
       }
       sessions: {

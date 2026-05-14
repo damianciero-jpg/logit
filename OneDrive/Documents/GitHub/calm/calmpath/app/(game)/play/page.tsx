@@ -36,7 +36,7 @@ function PlayPageContent() {
           if (childIdParam) {
             const match = kids.find(k => k.id === childIdParam)
             if (match) {
-              if (match.age >= 13 && localStorage.getItem(`teenMode_${match.id}`) === 'true') {
+              if ((match.game_mode ?? 'kids') === 'teen') {
                 router.replace(`/play-teen?childId=${match.id}`); return
               }
               setSelectedChild(match); setLoading(false); return
@@ -44,7 +44,7 @@ function PlayPageContent() {
           }
           if (kids.length === 1) {
             const only = kids[0]
-            if (only.age >= 13 && localStorage.getItem(`teenMode_${only.id}`) === 'true') {
+            if ((only.game_mode ?? 'kids') === 'teen') {
               router.replace(`/play-teen?childId=${only.id}`); return
             }
             setSelectedChild(only)

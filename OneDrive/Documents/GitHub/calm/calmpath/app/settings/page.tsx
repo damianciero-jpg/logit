@@ -40,7 +40,7 @@ export default function SettingsPage() {
 
   const [children,     setChildren]     = useState<Child[]>([])
   const [showAddChild, setShowAddChild] = useState(false)
-  const [teenModes,    setTeenModes]    = useState<Record<string, boolean>>({})
+  const [gameModes,    setGameModes]    = useState<Record<string, 'kids' | 'teen'>>({})
 
   const [signingOut,   setSigningOut]   = useState(false)
 
@@ -64,11 +64,11 @@ export default function SettingsPage() {
       if (childrenRes.data) {
         const kids = childrenRes.data as Child[]
         setChildren(kids)
-        const modes: Record<string, boolean> = {}
+        const modes: Record<string, 'kids' | 'teen'> = {}
         for (const k of kids) {
-          modes[k.id] = localStorage.getItem(`teenMode_${k.id}`) === 'true'
+          modes[k.id] = (k.game_mode ?? 'kids') as 'kids' | 'teen'
         }
-        setTeenModes(modes)
+        setGameModes(modes)
       }
       setLoading(false)
     })
@@ -97,10 +97,10 @@ export default function SettingsPage() {
     setShowAddChild(false)
   }
 
-  function toggleTeenMode(childId: string) {
-    const next = !teenModes[childId]
-    localStorage.setItem(`teenMode_${childId}`, String(next))
-    setTeenModes(prev => ({ ...prev, [childId]: next }))
+  async function updateGameMode(childId: string, mode: 'kids' | 'teen') {
+    setGameModes(prev => ({ ...prev, [childId]: mode }))
+    const supabase = createClient()
+    await supabase.from('children').update({ game_mode: mode }).eq('id', childId)
   }
 
   if (loading) return (
@@ -191,30 +191,28 @@ export default function SettingsPage() {
                         <div style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.9rem' }}>{child.name}</div>
                         <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Age {child.age}</div>
                       </div>
-                      {child.age >= 13 && (
+                      <div style={{ display: 'flex', borderRadius: '20px', overflow: 'hidden', border: '1px solid #E2E8F0', flexShrink: 0 }}>
                         <button
-                          onClick={() => toggleTeenMode(child.id)}
-                          title="Switch to Teen Mode"
+                          onClick={() => updateGameMode(child.id, 'kids')}
                           style={{
-                            display: 'flex', alignItems: 'center', gap: '6px',
-                            background: teenModes[child.id] ? '#6366F1' : '#E2E8F0',
-                            border: 'none', borderRadius: '20px', padding: '5px 10px 5px 6px',
-                            cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
+                            padding: '5px 10px', border: 'none',
+                            background: (gameModes[child.id] ?? 'kids') === 'kids' ? '#6366F1' : '#F1F5F9',
+                            color: (gameModes[child.id] ?? 'kids') === 'kids' ? 'white' : '#64748B',
+                            cursor: 'pointer', fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: '0.72rem',
+                            transition: 'all 0.15s',
                           }}
-                        >
-                          <div style={{
-                            width: '18px', height: '18px', borderRadius: '50%', background: 'white',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                          }} />
-                          <span style={{
-                            fontSize: '0.72rem', fontWeight: 700,
-                            color: teenModes[child.id] ? 'white' : '#64748B',
-                            whiteSpace: 'nowrap',
-                          }}>
-                            Teen Mode
-                          </span>
-                        </button>
-                      )}
+                        >🎮 Kids</button>
+                        <button
+                          onClick={() => updateGameMode(child.id, 'teen')}
+                          style={{
+                            padding: '5px 10px', border: 'none',
+                            background: (gameModes[child.id] ?? 'kids') === 'teen' ? '#6366F1' : '#F1F5F9',
+                            color: (gameModes[child.id] ?? 'kids') === 'teen' ? 'white' : '#64748B',
+                            cursor: 'pointer', fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: '0.72rem',
+                            transition: 'all 0.15s',
+                          }}
+                        >🌙 Teen</button>
+                      </div>
                     </div>
                   ))
                 )}

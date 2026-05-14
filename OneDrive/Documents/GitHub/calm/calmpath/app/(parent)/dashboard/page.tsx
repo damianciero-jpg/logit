@@ -8,7 +8,7 @@ import CalmPathDashboardRaw from '@/components/calmpath-dashboard'
 import AddChildModal from '@/components/add-child-modal'
 import type { Child } from '@/types/database'
 
-type DashboardProps = { childId: string; childName: string; childAge: number; childAvatar: string; childColor: string }
+type DashboardProps = { childId: string; childName: string; childAge: number; childAvatar: string; childColor: string; childGameMode: string }
 const CalmPathDashboard = CalmPathDashboardRaw as unknown as React.ComponentType<DashboardProps>
 
 export default function DashboardPage() {
@@ -93,6 +93,7 @@ export default function DashboardPage() {
         childAge={selectedChild.age}
         childAvatar={selectedChild.avatar}
         childColor={selectedChild.color}
+        childGameMode={selectedChild.game_mode ?? 'kids'}
       />
 
       {showAddChild && (
