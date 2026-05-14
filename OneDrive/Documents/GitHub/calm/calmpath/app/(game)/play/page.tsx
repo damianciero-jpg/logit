@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import MoodQuest from '@/components/moodquest.jsx'
 import type { Child } from '@/types/database'
 
 export default function PlayPage() {
-  const router = useRouter()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+  const childIdParam = searchParams.get('childId')
   const [loading, setLoading]             = useState(true)
   const [children, setChildren]           = useState<Child[]>([])
   const [selectedChild, setSelectedChild] = useState<Child | null>(null)
@@ -23,11 +25,15 @@ export default function PlayPage() {
         .then(({ data }) => {
           const kids = (data ?? []) as Child[]
           setChildren(kids)
+          if (childIdParam) {
+            const match = kids.find(k => k.id === childIdParam)
+            if (match) { setSelectedChild(match); setLoading(false); return }
+          }
           if (kids.length === 1) setSelectedChild(kids[0])
           setLoading(false)
         })
     })
-  }, [router])
+  }, [router, childIdParam])
 
   if (loading)       return <FullPageLoader />
   if (selectedChild) return <MoodQuest childId={selectedChild.id} />
