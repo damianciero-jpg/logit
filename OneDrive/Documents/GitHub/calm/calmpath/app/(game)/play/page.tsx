@@ -35,9 +35,20 @@ function PlayPageContent() {
           setChildren(kids)
           if (childIdParam) {
             const match = kids.find(k => k.id === childIdParam)
-            if (match) { setSelectedChild(match); setLoading(false); return }
+            if (match) {
+              if (match.age >= 13 && localStorage.getItem(`teenMode_${match.id}`) === 'true') {
+                router.replace(`/play-teen?childId=${match.id}`); return
+              }
+              setSelectedChild(match); setLoading(false); return
+            }
           }
-          if (kids.length === 1) setSelectedChild(kids[0])
+          if (kids.length === 1) {
+            const only = kids[0]
+            if (only.age >= 13 && localStorage.getItem(`teenMode_${only.id}`) === 'true') {
+              router.replace(`/play-teen?childId=${only.id}`); return
+            }
+            setSelectedChild(only)
+          }
           setLoading(false)
         })
     })

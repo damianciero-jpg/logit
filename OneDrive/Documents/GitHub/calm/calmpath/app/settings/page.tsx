@@ -40,6 +40,7 @@ export default function SettingsPage() {
 
   const [children,     setChildren]     = useState<Child[]>([])
   const [showAddChild, setShowAddChild] = useState(false)
+  const [teenModes,    setTeenModes]    = useState<Record<string, boolean>>({})
 
   const [signingOut,   setSigningOut]   = useState(false)
 
@@ -60,7 +61,15 @@ export default function SettingsPage() {
         setDisplayName(profileRes.data.full_name ?? '')
       }
 
-      if (childrenRes.data) setChildren(childrenRes.data as Child[])
+      if (childrenRes.data) {
+        const kids = childrenRes.data as Child[]
+        setChildren(kids)
+        const modes: Record<string, boolean> = {}
+        for (const k of kids) {
+          modes[k.id] = localStorage.getItem(`teenMode_${k.id}`) === 'true'
+        }
+        setTeenModes(modes)
+      }
       setLoading(false)
     })
   }, [router])
@@ -86,6 +95,12 @@ export default function SettingsPage() {
   function handleAddSuccess(child: Child) {
     setChildren(prev => [...prev, child])
     setShowAddChild(false)
+  }
+
+  function toggleTeenMode(childId: string) {
+    const next = !teenModes[childId]
+    localStorage.setItem(`teenMode_${childId}`, String(next))
+    setTeenModes(prev => ({ ...prev, [childId]: next }))
   }
 
   if (loading) return (
@@ -176,6 +191,30 @@ export default function SettingsPage() {
                         <div style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.9rem' }}>{child.name}</div>
                         <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Age {child.age}</div>
                       </div>
+                      {child.age >= 13 && (
+                        <button
+                          onClick={() => toggleTeenMode(child.id)}
+                          title="Switch to Teen Mode"
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            background: teenModes[child.id] ? '#6366F1' : '#E2E8F0',
+                            border: 'none', borderRadius: '20px', padding: '5px 10px 5px 6px',
+                            cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
+                          }}
+                        >
+                          <div style={{
+                            width: '18px', height: '18px', borderRadius: '50%', background: 'white',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                          }} />
+                          <span style={{
+                            fontSize: '0.72rem', fontWeight: 700,
+                            color: teenModes[child.id] ? 'white' : '#64748B',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            Teen Mode
+                          </span>
+                        </button>
+                      )}
                     </div>
                   ))
                 )}
