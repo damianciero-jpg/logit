@@ -1,12 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import MoodQuest from '@/components/moodquest.jsx'
 import type { Child } from '@/types/database'
 
 export default function PlayPage() {
+  return (
+    <Suspense fallback={<FullPageLoader />}>
+      <PlayPageContent />
+    </Suspense>
+  )
+}
+
+function PlayPageContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const childIdParam = searchParams.get('childId')
