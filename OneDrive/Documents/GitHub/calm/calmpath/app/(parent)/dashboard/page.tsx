@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type React from 'react'
 import { createClient } from '@/lib/supabase'
 import CalmPathDashboardRaw from '@/components/calmpath-dashboard'
+import AddChildModal from '@/components/add-child-modal'
 import type { Child } from '@/types/database'
 
 type DashboardProps = { childId: string; childName: string; childAge: number; childAvatar: string; childColor: string }
@@ -12,9 +13,10 @@ const CalmPathDashboard = CalmPathDashboardRaw as unknown as React.ComponentType
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [loading, setLoading]           = useState(true)
-  const [children, setChildren]         = useState<Child[]>([])
+  const [loading, setLoading]             = useState(true)
+  const [children, setChildren]           = useState<Child[]>([])
   const [selectedChild, setSelectedChild] = useState<Child | null>(null)
+  const [showAddChild, setShowAddChild]   = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -33,47 +35,58 @@ export default function DashboardPage() {
     })
   }, [router])
 
+  function handleAddSuccess(child: Child) {
+    setChildren(prev => [...prev, child])
+    setSelectedChild(child)
+    setShowAddChild(false)
+  }
+
   if (loading) return (
     <>
       <style>{`@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}`}</style>
-      <div style={{ minHeight:'100vh', background:'#F8FAFC', display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <div style={{ fontSize:'2rem', animation:'bounce 1.2s ease-in-out infinite' }}>📊</div>
+      <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: '2rem', animation: 'bounce 1.2s ease-in-out infinite' }}>📊</div>
       </div>
     </>
   )
 
-  if (!selectedChild) return (
-    <div style={{ minHeight:'100vh', background:'#F8FAFC', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'Outfit',sans-serif" }}>
-      <div style={{ textAlign:'center', color:'#94A3B8' }}>
-        <div style={{ fontSize:'3rem', marginBottom:'1rem' }}>👨‍👩‍👧</div>
-        <div style={{ fontSize:'1rem' }}>No children found on this account.</div>
-        <div style={{ fontSize:'0.85rem', marginTop:'4px' }}>Ask a parent to set up the app first.</div>
-      </div>
-    </div>
-  )
+  if (!selectedChild) {
+    return <AddChildModal onSuccess={handleAddSuccess} />
+  }
 
   return (
     <>
-      {children.length > 1 && (
-        <div style={{ background:'white', borderBottom:'1px solid #E2E8F0', padding:'0.5rem 1.5rem', display:'flex', gap:'8px', overflowX:'auto' }}>
-          {children.map(child => (
-            <button
-              key={child.id}
-              onClick={() => setSelectedChild(child)}
-              style={{
-                padding:'6px 16px', borderRadius:'20px', border:'none', cursor:'pointer',
-                background: selectedChild.id === child.id ? child.color : '#F1F5F9',
-                color: selectedChild.id === child.id ? 'white' : '#374151',
-                fontFamily:"'Outfit',sans-serif", fontWeight:700, fontSize:'0.82rem',
-                transition:'all 0.15s', display:'flex', alignItems:'center', gap:'6px',
-                flexShrink:0,
-              }}
-            >
-              <span>{child.avatar}</span> {child.name}
-            </button>
-          ))}
-        </div>
-      )}
+      <div style={{ background: 'white', borderBottom: '1px solid #E2E8F0', padding: '0.5rem 1.5rem', display: 'flex', gap: '8px', alignItems: 'center', overflowX: 'auto' }}>
+        {children.map(child => (
+          <button
+            key={child.id}
+            onClick={() => setSelectedChild(child)}
+            style={{
+              padding: '6px 16px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+              background: selectedChild.id === child.id ? child.color : '#F1F5F9',
+              color: selectedChild.id === child.id ? 'white' : '#374151',
+              fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: '0.82rem',
+              transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '6px',
+              flexShrink: 0,
+            }}
+          >
+            <span>{child.avatar}</span> {child.name}
+          </button>
+        ))}
+        <button
+          onClick={() => setShowAddChild(true)}
+          style={{
+            padding: '6px 14px', borderRadius: '20px', border: '1.5px dashed #CBD5E1',
+            background: 'white', color: '#64748B', cursor: 'pointer',
+            fontFamily: "'Outfit', sans-serif", fontWeight: 600, fontSize: '0.82rem',
+            transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '4px',
+            flexShrink: 0, marginLeft: 'auto',
+          }}
+        >
+          + Add Child
+        </button>
+      </div>
+
       <CalmPathDashboard
         childId={selectedChild.id}
         childName={selectedChild.name}
@@ -81,6 +94,13 @@ export default function DashboardPage() {
         childAvatar={selectedChild.avatar}
         childColor={selectedChild.color}
       />
+
+      {showAddChild && (
+        <AddChildModal
+          onSuccess={handleAddSuccess}
+          onCancel={() => setShowAddChild(false)}
+        />
+      )}
     </>
   )
 }
