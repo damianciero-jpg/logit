@@ -179,7 +179,7 @@ body{font-family:'Inter',sans-serif;background:#0A0A0F;-webkit-font-smoothing:an
 .li-home{padding:0 24px 24px;background:#F8FAFF;}
 .li-home-hero{padding:24px 0 20px;border-bottom:1px solid #E0E8F5;}
 .li-home-eyebrow{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;color:#185FA5;margin-bottom:8px;}
-.li-home-title{font-family:'Inter',sans-serif;font-size:24px;font-weight:700;color:#0A0F1E;line-height:1.2;margin-bottom:8px;letter-spacing:-0.3px;}
+.li-home-title{font-family:'Inter',sans-serif;font-size:17px;font-weight:700;color:#0A0F1E;line-height:1.3;margin-bottom:6px;letter-spacing:-0.2px;}
 .li-home-sub{font-size:13px;color:#5A6A8A;line-height:1.6;font-family:'Inter',sans-serif;font-weight:400;letter-spacing:0;}
 
 /* Usage meter */
@@ -282,14 +282,19 @@ body{font-family:'Inter',sans-serif;background:#0A0A0F;-webkit-font-smoothing:an
 .li-result-top{padding:22px 24px 14px;flex-shrink:0;}
 .li-cat-badge{display:inline-flex;align-items:center;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;margin-bottom:12px;}
 .li-result-summary{font-size:17px;font-weight:500;color:white;line-height:1.4;}
-.li-result-scroll{flex:1;overflow-y:auto;padding:0 24px;scrollbar-width:none;}
-.li-result-scroll::-webkit-scrollbar{display:none;}
+.li-result-scroll-wrap{position:relative;flex:1;min-height:0;max-height:60vh;}
+.li-result-scroll-wrap::after{content:"";position:absolute;bottom:0;left:0;right:0;height:36px;pointer-events:none;background:linear-gradient(to bottom,rgba(10,10,15,0),rgba(10,10,15,0.92));}
+.li-result-scroll{height:100%;overflow-y:auto;scroll-behavior:smooth;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 18px 28px 24px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.28) rgba(255,255,255,0.08);scrollbar-gutter:stable;}
+.li-result-scroll::-webkit-scrollbar{width:8px;}
+.li-result-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,0.08);border-radius:10px;}
+.li-result-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.28);border-radius:10px;}
+.li-result-scroll::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.40);}
 .li-field{border-top:1px solid rgba(255,255,255,0.06);padding:13px 0;}
 .li-field-label{font-family:'DM Mono',monospace;font-size:9px;color:rgba(255,255,255,0.22);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:5px;}
 .li-field-val{font-size:13px;color:rgba(255,255,255,0.65);line-height:1.6;background:transparent;border:none;width:100%;font-family:'Inter',sans-serif;resize:none;outline:none;}
 .li-field-val:focus{color:white;}
 .li-field-select{font-size:13px;color:rgba(255,255,255,0.65);background:transparent;border:none;width:100%;font-family:'Inter',sans-serif;outline:none;cursor:pointer;appearance:none;}
-.li-district-forms{padding:0 24px 8px;flex-shrink:0;max-height:230px;overflow-y:auto;scrollbar-width:none;}
+.li-district-forms{padding:0 24px 8px;flex-shrink:0;scrollbar-width:none;}
 .li-district-forms::-webkit-scrollbar{display:none;}
 .li-district-form-section{border-top:1px solid rgba(255,255,255,0.06);padding:11px 0;}
 .li-district-form-section summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;}
@@ -301,7 +306,7 @@ body{font-family:'Inter',sans-serif;background:#0A0A0F;-webkit-font-smoothing:an
 .li-district-copy:hover{border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.65);}
 .li-district-fields{padding-top:10px;display:flex;flex-direction:column;gap:8px;}
 .li-district-field-label{font-family:'DM Mono',monospace;font-size:8px;color:rgba(255,255,255,0.18);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:3px;}
-.li-district-field-value{width:100%;min-height:34px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.58);font-family:'Inter',sans-serif;font-size:12px;line-height:1.45;padding:8px 9px;resize:vertical;outline:none;}
+.li-district-field-value{min-height:36px;max-height:120px;overflow-y:auto;width:100%;min-height:34px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.58);font-family:'Inter',sans-serif;font-size:12px;line-height:1.45;padding:8px 9px;resize:vertical;outline:none;}
 .li-ferpa-note{text-align:center;padding:6px 24px 8px;font-size:10px;color:rgba(255,255,255,0.12);line-height:1.5;flex-shrink:0;}
 .li-report-actions{padding:0 24px 6px;flex-shrink:0;}
 .li-copy-main{width:100%;padding:11px 14px;border-radius:12px;border:none;background:white;color:#0A0A0F;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:0;transition:opacity 0.15s;}
@@ -619,6 +624,27 @@ function SettingsScreen({ usage, onUpgrade }) {
                 <div className="li-settings-row-label">Resets in</div>
               </div>
               <div className="li-settings-row-value">{daysLeft} days</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="li-settings-section">
+          <div className="li-settings-section-title">Install</div>
+          <div className="li-settings-group" style={{padding:"12px 14px"}}>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.62)",lineHeight:1.5,marginBottom:10}}>
+              Add LogIt to your home screen for a faster app-like experience.
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"rgba(255,255,255,0.28)",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:6}}>iPhone</div>
+                {["Tap Share", "Tap Add to Home Screen", "Tap Add"].map((item, i) => (
+                  <div key={item} style={{fontSize:11,color:"rgba(255,255,255,0.4)",lineHeight:1.5,marginBottom:3}}>{i + 1}. {item}</div>
+                ))}
+              </div>
+              <div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"rgba(255,255,255,0.28)",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:6}}>Android</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",lineHeight:1.5}}>1. Tap Install App or Add to Home Screen</div>
+              </div>
             </div>
           </div>
         </div>
@@ -945,6 +971,12 @@ export default function LogIt() {
   useEffect(() => {
     injectCSS();
     document.title = "LogIt — Teacher Incident Log";
+    // Warm the serverless function to reduce cold start latency
+    fetch("/api/format-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript: "__warmup__", districtId: "none" })
+    }).catch(() => {}); // ignore errors — this is just a warmup ping
   }, []);
 
   const [tab, setTab] = useState("home");
@@ -1156,18 +1188,20 @@ export default function LogIt() {
                 <button className="li-reformat" style={{ marginTop: 8 }} onClick={processTranscript}>↻ Try again</button>
               </div>
             )}
-            <div className="li-result-scroll">
-              {[["Description","description",3],["Action taken","action",2],["Follow-up","followup",2]].map(([lbl,key,rows]) => (
-                <div key={key} className="li-field">
-                  <div className="li-field-label">{lbl}</div>
-                  <textarea className="li-field-val" value={edited[key]||""} rows={rows} onChange={e=>setEdited({...edited,[key]:e.target.value})} />
+            <div className="li-result-scroll-wrap">
+              <div className="li-result-scroll">
+                {[["Description","description",3],["Action taken","action",2],["Follow-up","followup",2]].map(([lbl,key,rows]) => (
+                  <div key={key} className="li-field">
+                    <div className="li-field-label">{lbl}</div>
+                    <textarea className="li-field-val" value={edited[key]||""} rows={rows} onChange={e=>setEdited({...edited,[key]:e.target.value})} />
+                  </div>
+                ))}
+                <div className="li-field">
+                  <div className="li-field-label">Category</div>
+                  <select className="li-field-select" value={edited.category||"behavioral"} onChange={e=>setEdited({...edited,category:e.target.value})}>
+                    {Object.entries(CATS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                  </select>
                 </div>
-              ))}
-              <div className="li-field">
-                <div className="li-field-label">Category</div>
-                <select className="li-field-select" value={edited.category||"behavioral"} onChange={e=>setEdited({...edited,category:e.target.value})}>
-                  {Object.entries(CATS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
-                </select>
               </div>
             </div>
             <DistrictForms edited={edited} />
@@ -1196,7 +1230,8 @@ export default function LogIt() {
         {showProcessing && (
           <div className="li-processing">
             <div className="li-spinner" />
-            <div className="li-proc-text">Writing your report…</div>
+            <div className="li-proc-text">Formatting your report…</div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.2)",marginTop:6}}>Usually takes 3-5 seconds</div>
           </div>
         )}
 
