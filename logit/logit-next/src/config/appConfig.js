@@ -204,9 +204,9 @@ const configs = {
 
     // ── Result screen field definitions ─────────────────────────────────────
     resultFields: [
-      { label: "Description",  key: "description", rows: 3 },
-      { label: "Action taken", key: "action",       rows: 2 },
-      { label: "Follow-up",    key: "followup",     rows: 2 },
+      { label: "Description",  key: "description",  rows: 3 },
+      { label: "Action Taken", key: "action_taken", rows: 2 },
+      { label: "Follow-Up",    key: "follow_up",    rows: 2 },
     ],
 
     // ── Default category when keyword match fails ────────────────────────────
@@ -342,9 +342,9 @@ const configs = {
 
     // ── Result screen field definitions ─────────────────────────────────────
     resultFields: [
-      { label: "Job Description", key: "description", rows: 3 },
-      { label: "Work Performed",  key: "action",       rows: 2 },
-      { label: "Next Steps",      key: "followup",     rows: 2 },
+      { label: "Job Description", key: "description",  rows: 3 },
+      { label: "Work Performed",  key: "action_taken", rows: 2 },
+      { label: "Next Steps",      key: "follow_up",    rows: 2 },
     ],
 
     // ── Default category when keyword match fails ────────────────────────────

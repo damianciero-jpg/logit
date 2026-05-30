@@ -1,250 +1,409 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import appConfig from "@/config/appConfig";
+import { useMediaRecorder } from "@/hooks/useMediaRecorder";
+import HomeScreen from "@/components/HomeScreen";
+import RecordingScreen from "@/components/RecordingScreen";
+import ResultScreen from "@/components/ResultScreen";
+import LogsScreen from "@/components/LogsScreen";
 
-const { colors, cats, keywords, districts, features, howItWorksSteps, logFilters } = appConfig;
+const APP_MODE  = process.env.NEXT_PUBLIC_APP_MODE || "educator";
+const IS_TRADE  = APP_MODE === "trade";
+const FREE_LIMIT = 10;
 
-function suggestCategory(text) {
-  const lower = text.toLowerCase();
-  const scores = Object.entries(keywords).map(([cat, words]) => ({
-    cat,
-    score: words.reduce((n, w) => (lower.includes(w) ? n + 1 : n), 0),
-  }));
-  scores.sort((a, b) => b.score - a.score);
-  return scores[0].score > 0 ? scores[0].cat : appConfig.defaultCategory;
+const TABS = [
+  { id: "home",   icon: "🏠",  label: "Home" },
+  { id: "record", icon: "🎙️", label: IS_TRADE ? "Log Job" : "Record" },
+  { id: "logs",   icon: "📋",  label: IS_TRADE ? "Jobs" : "Logs" },
+];
+
+// ── localStorage helpers (safe to call only on the client) ──────────────────
+function lsGet(key, fallback = null) {
+  try { const v = localStorage.getItem(key); return v !== null ? v : fallback; }
+  catch { return fallback; }
 }
+function lsSet(key, val) { try { localStorage.setItem(key, String(val)); } catch {} }
 
-function CatBadge({ catKey }) {
-  const cat = cats[catKey];
-  if (!cat) return null;
+// ── Status bar ──────────────────────────────────────────────────────────────
+function StatusBar({ isDark, usage }) {
+  const { colors } = appConfig;
   return (
-    <span
-      className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
-      style={{ background: cat.bg, color: cat.color }}
+    <div
+      className={`flex items-center justify-between px-5 pt-4 pb-1 flex-shrink-0 transition-colors duration-300 ${
+        isDark ? "bg-[#111118]" : "bg-slate-50"
+      }`}
     >
-      {cat.label}
-    </span>
+      <div className="flex items-center gap-2">
+        <div
+          className="w-7 h-7 rounded-[7px] flex items-center justify-center font-bold text-white text-xs"
+          style={{ background: colors.primary }}
+        >
+          {appConfig.appTitle[0]}
+        </div>
+        <span className={`font-bold text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
+          {appConfig.appTitle}
+        </span>
+      </div>
+      <span className={`text-[11px] font-mono ${isDark ? "text-white/25" : "text-slate-400"}`}>
+        {usage} / {FREE_LIMIT}
+      </span>
+    </div>
   );
 }
 
-export default function Home() {
-  const catEntries = Object.entries(cats);
-  const primaryColor = colors.primary;
-  const secondaryColor = colors.secondary;
-  const mode = process.env.NEXT_PUBLIC_APP_MODE || "educator";
+// ── Tab bar ─────────────────────────────────────────────────────────────────
+function TabBar({ activeTab, isDark, onTabChange }) {
+  const { colors } = appConfig;
+  return (
+    <div
+      className={`flex flex-shrink-0 transition-colors duration-300 ${
+        isDark
+          ? "border-t border-white/8 bg-[#111118]"
+          : "border-t border-slate-200 bg-white"
+      }`}
+    >
+      {TABS.map((t) => {
+        const active = activeTab === t.id;
+        return (
+          <button
+            key={t.id}
+            onClick={() => onTabChange(t.id)}
+            className="flex-1 flex flex-col items-center justify-center py-2.5 pb-4 gap-1 cursor-pointer bg-transparent border-none"
+          >
+            <span className="text-xl leading-none" style={{ opacity: active ? 1 : 0.35 }}>
+              {t.icon}
+            </span>
+            <span
+              className="text-[10px] font-medium tracking-wide"
+              style={{
+                color: isDark
+                  ? active ? "white" : "rgba(255,255,255,0.3)"
+                  : active ? colors.secondary : "#8899BB",
+              }}
+            >
+              {t.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Processing spinner ───────────────────────────────────────────────────────
+function ProcessingOverlay() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-[#111118]">
+      <div className="w-9 h-9 rounded-full border-[1.5px] border-white/10 border-t-white/60 animate-spin" />
+      <p className="text-[13px] text-white/30">Formatting your report…</p>
+      <p className="text-[10px] text-white/15">Usually 3–5 seconds</p>
+    </div>
+  );
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
+export default function Page() {
+  // ── Hydration guard ── prevents localStorage reads during SSR
+  const [mounted, setMounted]   = useState(false);
+
+  // ── Persistent state (localStorage) ──
+  const [logs,     setLogs]     = useState([]);
+  const [usage,    setUsage]    = useState(0);
+  const [district, setDistrict] = useState("none");
+
+  // ── Session state ──
+  const [tab,    setTab]    = useState("home");
+  const [phase,  setPhase]  = useState("idle"); // idle | processing | result
+  const [edited, setEdited] = useState(null);
+  const [aiError, setAiError] = useState("");
+  const [toast,  setToast]  = useState("");
+
+  const recorder = useMediaRecorder();
+
+  // ── Mount: hydrate from localStorage (client only) ─────────────────────
+  useEffect(() => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const savedMonth   = lsGet("logit_usage_month");
+    if (savedMonth !== currentMonth) {
+      lsSet("logit_usage_month", currentMonth);
+      lsSet("logit_monthly_usage", "0");
+      setUsage(0);
+    } else {
+      setUsage(parseInt(lsGet("logit_monthly_usage", "0"), 10));
+    }
+    try { setLogs(JSON.parse(lsGet("logit_logs", "[]"))); } catch { setLogs([]); }
+    setDistrict(lsGet("logit_district", "none"));
+    setMounted(true);
+  }, []);
+
+  // ── Send audio blob to API when recording finishes ─────────────────────
+  useEffect(() => {
+    if (!recorder.audioBlob) return;
+    processAudio(recorder.audioBlob);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorder.audioBlob]);
+
+  // ── Whisper + Claude pipeline ──────────────────────────────────────────
+  async function processAudio(blob) {
+    setPhase("processing");
+    setAiError("");
+
+    const fd = new FormData();
+    fd.append("audio", blob, "recording.webm");
+    fd.append("appMode", APP_MODE);
+    fd.append("districtId", district);
+
+    try {
+      const res  = await fetch("/api/format-report", { method: "POST", body: fd });
+      const data = await res.json();
+
+      if (data.error && !data.summary) {
+        showToast("Processing failed — please try again.");
+        setPhase("idle");
+        return;
+      }
+      if (data.aiError) {
+        setAiError("AI used fallback formatting. Edit the fields below as needed.");
+      }
+
+      setEdited({ ...data });
+      setPhase("result");
+    } catch {
+      showToast("Network error — please try again.");
+      setPhase("idle");
+    }
+  }
+
+  // ── Save log to localStorage ───────────────────────────────────────────
+  function saveLog() {
+    if (!edited) return;
+    const entry = {
+      id:       Date.now().toString(),
+      category: edited.category     ?? appConfig.defaultCategory,
+      summary:  edited.summary      ?? "",
+      description:      edited.description      ?? "",
+      action_taken:     edited.action_taken      ?? "",
+      follow_up:        edited.follow_up         ?? "",
+      districtId:       edited.districtId        ?? district,
+      // educator district forms
+      behavior_referral: edited.behavior_referral ?? null,
+      osr5_statement:    edited.osr5_statement    ?? null,
+      district_report:   edited.district_report   ?? null,
+      nj_report:         edited.nj_report         ?? null,
+      pa_report:         edited.pa_report         ?? null,
+      // trade fields
+      client_issue:           edited.client_issue           ?? null,
+      diagnostic_findings:    edited.diagnostic_findings    ?? null,
+      materials_used:         edited.materials_used         ?? null,
+      recommended_next_steps: edited.recommended_next_steps ?? null,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = [entry, ...logs];
+    setLogs(updated);
+    lsSet("logit_logs", JSON.stringify(updated));
+
+    const nextUsage = usage + 1;
+    setUsage(nextUsage);
+    lsSet("logit_monthly_usage", String(nextUsage));
+
+    discard();
+    setTab("home");
+    showToast("✓ Log saved");
+  }
+
+  function discard() {
+    setPhase("idle");
+    setEdited(null);
+    setAiError("");
+  }
+
+  function deleteLog(id) {
+    const updated = logs.filter((l) => l.id !== id);
+    setLogs(updated);
+    lsSet("logit_logs", JSON.stringify(updated));
+    showToast("Log deleted");
+  }
+
+  // ── Copy-to-clipboard text builder ────────────────────────────────────
+  function buildCopyText(log) {
+    const catLabel = appConfig.cats[log.category]?.label ?? log.category;
+    const date     = new Date(log.createdAt).toLocaleString();
+
+    if (IS_TRADE) {
+      return [
+        appConfig.logExportHeader, "─".repeat(40),
+        `Category:   ${catLabel}`,
+        `Date/Time:  ${date}`, "",
+        "CLIENT ISSUE",        log.client_issue    ?? log.description, "",
+        "DIAGNOSTIC FINDINGS", log.diagnostic_findings ?? "",          "",
+        "WORK PERFORMED",      log.action_taken    ?? "",              "",
+        "MATERIALS USED",      log.materials_used  ?? "",              "",
+        "NEXT STEPS",          log.recommended_next_steps ?? log.follow_up, "",
+        "─".repeat(40), appConfig.logExportFooter,
+      ].join("\n");
+    }
+
+    return [
+      appConfig.logExportHeader, "─".repeat(40),
+      `Category:   ${catLabel}`,
+      `Date/Time:  ${date}`, "",
+      "SUMMARY",     log.summary,    "",
+      "DESCRIPTION", log.description, "",
+      "ACTION TAKEN", log.action_taken, "",
+      "FOLLOW-UP",   log.follow_up,   "",
+      "─".repeat(40), appConfig.logExportFooter,
+    ].join("\n");
+  }
+
+  function copyEdited() {
+    if (!edited) return;
+    navigator.clipboard?.writeText(
+      buildCopyText({ ...edited, createdAt: new Date().toISOString() })
+    );
+    showToast("✓ Copied to clipboard");
+  }
+
+  function copyLog(log) {
+    navigator.clipboard?.writeText(buildCopyText(log));
+    showToast("✓ Copied");
+  }
+
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2500);
+  }
+
+  function handleDistrictChange(id) {
+    setDistrict(id);
+    lsSet("logit_district", id);
+  }
+
+  async function handleStartRecording() {
+    if (usage >= FREE_LIMIT) {
+      showToast(`Free limit of ${FREE_LIMIT} reached.`);
+      return;
+    }
+    await recorder.startRecording();
+    setTab("record");
+  }
+
+  function handleTabChange(id) {
+    if (phase === "result") discard();
+    setTab(id);
+  }
+
+  // ── Derived display flags ──────────────────────────────────────────────
+  const isRecording   = recorder.isRecording;
+  const showResult    = phase === "result" && edited !== null;
+  const showProcessing = phase === "processing";
+
+  // Shell goes dark when on any screen except the educator home tab.
+  const isDark =
+    IS_TRADE || tab !== "home" || showResult || showProcessing || isRecording;
 
   return (
-    <main
-      className="min-h-screen flex flex-col"
-      style={{ background: colors.appBg, color: "#ffffff" }}
+    <div
+      className={`min-h-screen flex items-start justify-center p-4 sm:p-8 sm:items-center ${
+        IS_TRADE ? "bg-zinc-950" : "bg-slate-100"
+      }`}
     >
-      {/* Header */}
-      <header
-        className="flex items-center justify-between px-6 py-4 border-b"
-        style={{ borderColor: "rgba(255,255,255,0.06)" }}
+      {/* ── Phone shell ── */}
+      <div
+        className={`w-full max-w-sm flex flex-col relative overflow-hidden rounded-[2.75rem] transition-colors duration-300 ${
+          isDark
+            ? "bg-[#111118] border border-white/8"
+            : "bg-white border border-slate-200"
+        }`}
+        style={{ minHeight: "780px" }}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white text-sm"
-            style={{ background: primaryColor }}
-          >
-            {appConfig.appTitle[0]}
-          </div>
-          <div>
-            <div className="font-bold text-base leading-tight">{appConfig.appTitle}</div>
-            <div className="text-xs text-white/40">{appConfig.tagline}</div>
-          </div>
-        </div>
-        <div
-          className="text-xs font-mono px-3 py-1 rounded-full border"
-          style={{ borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.35)" }}
-        >
-          {mode} mode
-        </div>
-      </header>
+        <StatusBar isDark={isDark} usage={mounted ? usage : 0} />
 
-      <div className="flex-1 max-w-2xl mx-auto w-full px-6 py-8 flex flex-col gap-10">
-
-        {/* Hero */}
-        <section className="flex flex-col gap-4">
-          <div
-            className="text-xs font-mono uppercase tracking-widest"
-            style={{ color: primaryColor }}
-          >
-            {appConfig.tagline}
+        {/* Recorder permission / hardware error */}
+        {recorder.error && !isRecording && (
+          <div className="mx-5 mt-2 mb-0 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-[12px] text-red-700 leading-relaxed flex-shrink-0">
+            {recorder.error}
           </div>
-          <h1 className="text-3xl font-bold leading-snug text-white">
-            {appConfig.appTitle}
-          </h1>
-          <p className="text-sm leading-relaxed max-w-lg" style={{ color: "rgba(255,255,255,0.5)" }}>
-            {appConfig.appDescription}
-          </p>
-          <button
-            className="self-start mt-2 px-6 py-3 rounded-2xl font-semibold text-sm transition-opacity hover:opacity-90"
-            style={{ background: primaryColor, color: "#fff" }}
-          >
-            {appConfig.ctaLabel}
-          </button>
-        </section>
+        )}
 
-        {/* Features */}
-        <section className="flex flex-col gap-4">
-          <h2
-            className="text-xs font-mono uppercase tracking-widest"
-            style={{ color: "rgba(255,255,255,0.3)" }}
-          >
-            Features
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {features.map((f) => (
-              <div
-                key={f.title}
-                className="rounded-2xl border p-5 flex flex-col gap-3"
-                style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                  style={{ background: f.bg }}
-                >
-                  {f.icon}
-                </div>
-                <div>
-                  <div className="font-semibold text-sm text-white">{f.title}</div>
-                  <div className="text-xs mt-1 leading-relaxed" style={{ color: "rgba(255,255,255,0.4)" }}>
-                    {f.sub}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        {/* ── Full-height overlays ── */}
+        {showResult && (
+          <ResultScreen
+            result={edited}
+            onFieldChange={(key, val) =>
+              setEdited((prev) => ({ ...prev, [key]: val }))
+            }
+            onCategoryChange={(cat) =>
+              setEdited((prev) => ({ ...prev, category: cat }))
+            }
+            onSave={saveLog}
+            onDiscard={discard}
+            onCopy={copyEdited}
+            aiError={aiError}
+          />
+        )}
 
-        {/* How it works */}
-        <section className="flex flex-col gap-4">
-          <h2
-            className="text-xs font-mono uppercase tracking-widest"
-            style={{ color: "rgba(255,255,255,0.3)" }}
-          >
-            How it works
-          </h2>
-          <div className="flex flex-col gap-4">
-            {howItWorksSteps.map(([title, sub], i) => (
-              <div key={title} className="flex gap-4 items-start">
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-0.5"
-                  style={{ background: primaryColor }}
-                >
-                  {i + 1}
-                </div>
-                <div>
-                  <div className="font-semibold text-sm text-white">{title}</div>
-                  <div className="text-xs mt-0.5 leading-relaxed" style={{ color: "rgba(255,255,255,0.4)" }}>
-                    {sub}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        {showProcessing && <ProcessingOverlay />}
 
-        {/* Categories */}
-        <section className="flex flex-col gap-4">
-          <h2
-            className="text-xs font-mono uppercase tracking-widest"
-            style={{ color: "rgba(255,255,255,0.3)" }}
-          >
-            Log Categories
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {catEntries.map(([key]) => (
-              <CatBadge key={key} catKey={key} />
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2 mt-1">
-            {logFilters.slice(1).map((f) => (
-              <button
-                key={f.id}
-                className="px-3 py-1 rounded-full text-xs font-medium border"
-                style={{ borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.4)" }}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </section>
+        {isRecording && (
+          <RecordingScreen
+            isRecording
+            recordingSeconds={recorder.recordingSeconds}
+            onStop={recorder.stopRecording}
+          />
+        )}
 
-        {/* Districts / Regions */}
-        <section className="flex flex-col gap-4">
-          <h2
-            className="text-xs font-mono uppercase tracking-widest"
-            style={{ color: "rgba(255,255,255,0.3)" }}
-          >
-            {mode === "trade" ? "Service Regions" : "District Forms"}
-          </h2>
-          <div className="flex flex-col gap-2">
-            {districts.map((d) => (
-              <div
-                key={d.id}
-                className="flex items-center gap-3 rounded-xl border px-4 py-3"
-                style={{ borderColor: "rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.03)" }}
-              >
-                <span className="text-base">{d.icon}</span>
-                <span className="text-sm" style={{ color: "rgba(255,255,255,0.7)" }}>{d.label}</span>
-                {d.state && (
-                  <span
-                    className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
-                    style={{ background: secondaryColor + "22", color: secondaryColor }}
-                  >
-                    {d.state}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Active config preview */}
-        <section className="flex flex-col gap-3">
-          <h2
-            className="text-xs font-mono uppercase tracking-widest"
-            style={{ color: "rgba(255,255,255,0.3)" }}
-          >
-            Active Config
-          </h2>
-          <pre
-            className="rounded-2xl border p-5 text-xs font-mono leading-relaxed overflow-x-auto"
-            style={{
-              borderColor: "rgba(255,255,255,0.07)",
-              background: "rgba(255,255,255,0.02)",
-              color: "rgba(255,255,255,0.4)",
-            }}
-          >
-            {JSON.stringify(
-              {
-                mode,
-                title: appConfig.appTitle,
-                categories: Object.keys(cats),
-                districts: districts.map((d) => d.id),
-                primaryColor: colors.primary,
-                secondaryColor: colors.secondary,
-              },
-              null,
-              2,
+        {/* ── Tab content (hidden when any overlay is active) ── */}
+        {!showResult && !showProcessing && !isRecording && (
+          <>
+            {tab === "home" && (
+              <HomeScreen
+                logs={mounted ? logs : []}
+                usage={mounted ? usage : 0}
+                freeLimit={FREE_LIMIT}
+                district={district}
+                onDistrictChange={handleDistrictChange}
+                onStartLogging={handleStartRecording}
+              />
             )}
-          </pre>
-        </section>
+            {tab === "record" && (
+              <RecordingScreen
+                isRecording={false}
+                recordingSeconds={0}
+                onStart={handleStartRecording}
+                onStop={recorder.stopRecording}
+              />
+            )}
+            {tab === "logs" && (
+              <LogsScreen
+                logs={mounted ? logs : []}
+                onDelete={deleteLog}
+                onCopy={copyLog}
+              />
+            )}
+          </>
+        )}
 
+        {/* ── Tab bar (hidden only during active recording or processing) ── */}
+        {!isRecording && !showProcessing && (
+          <TabBar
+            activeTab={tab}
+            isDark={isDark || showResult}
+            onTabChange={handleTabChange}
+          />
+        )}
+
+        {/* ── Toast ── */}
+        {toast && (
+          <div
+            className="absolute bottom-20 left-1/2 px-5 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-[12px] text-white whitespace-nowrap z-20 pointer-events-none"
+            style={{ animation: "toastIn 0.25s ease", transform: "translateX(-50%)" }}
+          >
+            {toast}
+          </div>
+        )}
       </div>
-
-      {/* Footer */}
-      <footer
-        className="px-6 py-5 text-center text-xs border-t"
-        style={{ borderColor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.2)" }}
-      >
-        {appConfig.appTitle} by {appConfig.company} · {appConfig.freeTierLabel}
-        <br />
-        {appConfig.footerNote}
-      </footer>
-    </main>
+    </div>
   );
 }
