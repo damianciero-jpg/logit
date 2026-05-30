@@ -4,6 +4,7 @@
 const configs = {
   // ── EDUCATOR ─────────────────────────────────────────────────────────────────
   educator: {
+    appMode: "educator",
     appTitle: "LogIt",
     appSubtitle: "Teacher Incident Log",
     appDescription:
@@ -218,6 +219,7 @@ const configs = {
 
   // ── TRADE (Field Service / Plumbing) ─────────────────────────────────────────
   trade: {
+    appMode: "trade",
     appTitle: "ServiceLog",
     appSubtitle: "Field Service Job Log",
     appDescription:

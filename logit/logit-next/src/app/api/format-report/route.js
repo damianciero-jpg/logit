@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const WHISPER_URL = "https://api.openai.com/v1/audio/transcriptions";
+const WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const CLAUDE_MODEL = "claude-sonnet-4-6";
@@ -14,18 +14,18 @@ async function transcribeAudio(audioFile) {
     : audioFile.type?.includes("ogg") ? "ogg"
     : "webm";
   form.append("file", audioFile, audioFile.name || `recording.${ext}`);
-  form.append("model", "whisper-1");
+  form.append("model", "whisper-large-v3-turbo");
   form.append("language", "en");
 
   const res = await fetch(WHISPER_URL, {
     method: "POST",
-    headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
     body: form,
   });
 
   if (!res.ok) {
     const detail = await res.text().catch(() => res.statusText);
-    throw new Error(`Whisper ${res.status}: ${detail}`);
+    throw new Error(`Groq Whisper ${res.status}: ${detail}`);
   }
 
   const data = await res.json();
@@ -226,9 +226,9 @@ async function formatWithClaude(transcript, appMode, districtId) {
 
 export async function POST(request) {
   // ── Config guards ──────────────────────────────────────────────────────────
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.GROQ_API_KEY) {
     return NextResponse.json(
-      { error: "Server misconfiguration: OPENAI_API_KEY is not set." },
+      { error: "Server misconfiguration: GROQ_API_KEY is not set." },
       { status: 500 }
     );
   }
@@ -270,7 +270,7 @@ export async function POST(request) {
   try {
     transcript = await transcribeAudio(audioFile);
   } catch (err) {
-    console.error("[format-report] Whisper error:", err.message);
+    console.error("[format-report] Groq Whisper error:", err.message);
     return NextResponse.json(
       { error: `Transcription failed: ${err.message}` },
       { status: 502 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import appConfig from "@/config/appConfig";
-
-const IS_TRADE = process.env.NEXT_PUBLIC_APP_MODE === "trade";
-const { colors, cats, logFilters } = appConfig;
+import { useModeConfig } from "@/context/ModeContext";
 
 export default function LogsScreen({ logs, onDelete, onCopy }) {
+  const config  = useModeConfig();
+  const IS_TRADE = config.appMode === "trade";
+  const { colors, cats, logFilters } = config;
+
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
 

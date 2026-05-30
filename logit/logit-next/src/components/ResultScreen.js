@@ -1,9 +1,6 @@
 "use client";
 
-import appConfig from "@/config/appConfig";
-
-const IS_TRADE = process.env.NEXT_PUBLIC_APP_MODE === "trade";
-const { colors, cats, resultFields, districtForms } = appConfig;
+import { useModeConfig } from "@/context/ModeContext";
 
 function fieldLabel(key) {
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -102,6 +99,10 @@ export default function ResultScreen({
   onCopy,
   aiError,
 }) {
+  const config = useModeConfig();
+  const IS_TRADE = config.appMode === "trade";
+  const { colors, cats, resultFields, districtForms } = config;
+
   if (!result) return null;
   const cat = cats[result.category];
 

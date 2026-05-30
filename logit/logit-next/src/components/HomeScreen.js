@@ -1,9 +1,6 @@
 "use client";
 
-import appConfig from "@/config/appConfig";
-
-const IS_TRADE = process.env.NEXT_PUBLIC_APP_MODE === "trade";
-const { colors, districts, howItWorksSteps, cats } = appConfig;
+import { useModeConfig } from "@/context/ModeContext";
 
 export default function HomeScreen({
   logs,
@@ -12,7 +9,12 @@ export default function HomeScreen({
   district,
   onDistrictChange,
   onStartLogging,
+  onModeToggle,
 }) {
+  const config = useModeConfig();
+  const IS_TRADE = config.appMode === "trade";
+  const { colors, districts, howItWorksSteps, cats } = config;
+
   const lastLog = logs[0] ?? null;
   const usagePct = Math.min((usage / freeLimit) * 100, 100);
   const daysLeft = 30 - new Date().getDate();
@@ -273,16 +275,32 @@ export default function HomeScreen({
             className="w-full py-3.5 rounded-2xl font-bold text-sm text-white transition-opacity hover:opacity-90 active:opacity-80"
             style={{ background: colors.primary }}
           >
-            {appConfig.ctaLabel}
+            {config.ctaLabel}
           </button>
         </div>
 
         {/* ── Footer ── */}
         <p className={`text-center text-[10px] leading-relaxed pt-4 ${textMute}`}>
-          {appConfig.appTitle} by {appConfig.company} · {appConfig.freeTierLabel}
+          {config.appTitle} by {config.company} · {config.freeTierLabel}
           <br />
-          {appConfig.footerNote}
+          {config.footerNote}
         </p>
+
+        {/* ── Dev mode toggle ── */}
+        {onModeToggle && (
+          <div className="pt-2 pb-1 flex justify-center">
+            <button
+              onClick={onModeToggle}
+              className={`text-[9px] font-mono px-3 py-1.5 rounded-full border transition-all ${
+                IS_TRADE
+                  ? "border-white/10 text-white/20 hover:text-white/45 hover:border-white/25"
+                  : "border-slate-200 text-slate-300 hover:text-slate-500 hover:border-slate-300"
+              }`}
+            >
+              ⌥ switch to {IS_TRADE ? "educator" : "trade"} mode
+            </button>
+          </div>
+        )}
 
       </div>
     </div>

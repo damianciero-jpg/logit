@@ -1,33 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import appConfig from "@/config/appConfig";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { configs } from "@/config/appConfig";
+import { ModeContext, useModeConfig } from "@/context/ModeContext";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
 import HomeScreen from "@/components/HomeScreen";
 import RecordingScreen from "@/components/RecordingScreen";
 import ResultScreen from "@/components/ResultScreen";
 import LogsScreen from "@/components/LogsScreen";
 
-const APP_MODE  = process.env.NEXT_PUBLIC_APP_MODE || "educator";
-const IS_TRADE  = APP_MODE === "trade";
-const FREE_LIMIT = 10;
+const BUILD_MODE  = process.env.NEXT_PUBLIC_APP_MODE || "educator";
+const FREE_LIMIT  = 10;
 
-const TABS = [
-  { id: "home",   icon: "🏠",  label: "Home" },
-  { id: "record", icon: "🎙️", label: IS_TRADE ? "Log Job" : "Record" },
-  { id: "logs",   icon: "📋",  label: IS_TRADE ? "Jobs" : "Logs" },
-];
-
-// ── localStorage helpers (safe to call only on the client) ──────────────────
+// ── localStorage helpers ─────────────────────────────────────────────────────
 function lsGet(key, fallback = null) {
   try { const v = localStorage.getItem(key); return v !== null ? v : fallback; }
   catch { return fallback; }
 }
 function lsSet(key, val) { try { localStorage.setItem(key, String(val)); } catch {} }
 
-// ── Status bar ──────────────────────────────────────────────────────────────
+// ── Status bar ───────────────────────────────────────────────────────────────
 function StatusBar({ isDark, usage }) {
-  const { colors } = appConfig;
+  const config = useModeConfig();
   return (
     <div
       className={`flex items-center justify-between px-5 pt-4 pb-1 flex-shrink-0 transition-colors duration-300 ${
@@ -37,12 +32,12 @@ function StatusBar({ isDark, usage }) {
       <div className="flex items-center gap-2">
         <div
           className="w-7 h-7 rounded-[7px] flex items-center justify-center font-bold text-white text-xs"
-          style={{ background: colors.primary }}
+          style={{ background: config.colors.primary }}
         >
-          {appConfig.appTitle[0]}
+          {config.appTitle[0]}
         </div>
         <span className={`font-bold text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
-          {appConfig.appTitle}
+          {config.appTitle}
         </span>
       </div>
       <span className={`text-[11px] font-mono ${isDark ? "text-white/25" : "text-slate-400"}`}>
@@ -52,9 +47,9 @@ function StatusBar({ isDark, usage }) {
   );
 }
 
-// ── Tab bar ─────────────────────────────────────────────────────────────────
-function TabBar({ activeTab, isDark, onTabChange }) {
-  const { colors } = appConfig;
+// ── Tab bar ──────────────────────────────────────────────────────────────────
+function TabBar({ activeTab, isDark, tabs, onTabChange }) {
+  const { colors } = useModeConfig();
   return (
     <div
       className={`flex flex-shrink-0 transition-colors duration-300 ${
@@ -63,7 +58,7 @@ function TabBar({ activeTab, isDark, onTabChange }) {
           : "border-t border-slate-200 bg-white"
       }`}
     >
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const active = activeTab === t.id;
         return (
           <button
@@ -91,7 +86,7 @@ function TabBar({ activeTab, isDark, onTabChange }) {
   );
 }
 
-// ── Processing spinner ───────────────────────────────────────────────────────
+// ── Processing spinner ────────────────────────────────────────────────────────
 function ProcessingOverlay() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-[#111118]">
@@ -102,26 +97,45 @@ function ProcessingOverlay() {
   );
 }
 
-// ── Page ────────────────────────────────────────────────────────────────────
-export default function Page() {
-  // ── Hydration guard ── prevents localStorage reads during SSR
-  const [mounted, setMounted]   = useState(false);
+// ── Inner app — uses useSearchParams so it must be inside <Suspense> ─────────
+function AppShell() {
+  const searchParams = useSearchParams();
 
-  // ── Persistent state (localStorage) ──
+  // Resolve runtime mode: ?mode= query param > build-time env default.
+  // Validated against known modes so arbitrary query values are ignored.
+  const queryMode = searchParams.get("mode");
+  const resolvedDefault =
+    queryMode === "trade" || queryMode === "educator" ? queryMode : BUILD_MODE;
+
+  const [activeMode, setActiveMode] = useState(resolvedDefault);
+  const activeConfig = configs[activeMode] ?? configs.educator;
+  const IS_TRADE = activeMode === "trade";
+
+  // Tabs are mode-dependent so derived here, not at module level.
+  const TABS = [
+    { id: "home",   icon: "🏠",  label: "Home" },
+    { id: "record", icon: "🎙️", label: IS_TRADE ? "Log Job" : "Record" },
+    { id: "logs",   icon: "📋",  label: IS_TRADE ? "Jobs" : "Logs" },
+  ];
+
+  // ── Hydration guard ──
+  const [mounted,  setMounted]  = useState(false);
+
+  // ── Persistent state ──
   const [logs,     setLogs]     = useState([]);
   const [usage,    setUsage]    = useState(0);
   const [district, setDistrict] = useState("none");
 
   // ── Session state ──
-  const [tab,    setTab]    = useState("home");
-  const [phase,  setPhase]  = useState("idle"); // idle | processing | result
-  const [edited, setEdited] = useState(null);
+  const [tab,     setTab]     = useState("home");
+  const [phase,   setPhase]   = useState("idle");
+  const [edited,  setEdited]  = useState(null);
   const [aiError, setAiError] = useState("");
-  const [toast,  setToast]  = useState("");
+  const [toast,   setToast]   = useState("");
 
   const recorder = useMediaRecorder();
 
-  // ── Mount: hydrate from localStorage (client only) ─────────────────────
+  // ── Mount: hydrate from localStorage ──────────────────────────────────────
   useEffect(() => {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const savedMonth   = lsGet("logit_usage_month");
@@ -137,21 +151,21 @@ export default function Page() {
     setMounted(true);
   }, []);
 
-  // ── Send audio blob to API when recording finishes ─────────────────────
+  // ── Send audio blob to API when recording finishes ────────────────────────
   useEffect(() => {
     if (!recorder.audioBlob) return;
     processAudio(recorder.audioBlob);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorder.audioBlob]);
 
-  // ── Whisper + Claude pipeline ──────────────────────────────────────────
+  // ── Whisper (Groq) + Claude pipeline ─────────────────────────────────────
   async function processAudio(blob) {
     setPhase("processing");
     setAiError("");
 
     const fd = new FormData();
     fd.append("audio", blob, "recording.webm");
-    fd.append("appMode", APP_MODE);
+    fd.append("appMode", activeMode);
     fd.append("districtId", district);
 
     try {
@@ -175,39 +189,34 @@ export default function Page() {
     }
   }
 
-  // ── Save log to localStorage ───────────────────────────────────────────
+  // ── Save log ───────────────────────────────────────────────────────────────
   function saveLog() {
     if (!edited) return;
     const entry = {
       id:       Date.now().toString(),
-      category: edited.category     ?? appConfig.defaultCategory,
-      summary:  edited.summary      ?? "",
-      description:      edited.description      ?? "",
-      action_taken:     edited.action_taken      ?? "",
-      follow_up:        edited.follow_up         ?? "",
-      districtId:       edited.districtId        ?? district,
-      // educator district forms
+      category: edited.category  ?? activeConfig.defaultCategory,
+      summary:  edited.summary   ?? "",
+      description:      edited.description  ?? "",
+      action_taken:     edited.action_taken ?? "",
+      follow_up:        edited.follow_up    ?? "",
+      districtId:       edited.districtId   ?? district,
       behavior_referral: edited.behavior_referral ?? null,
       osr5_statement:    edited.osr5_statement    ?? null,
       district_report:   edited.district_report   ?? null,
       nj_report:         edited.nj_report         ?? null,
       pa_report:         edited.pa_report         ?? null,
-      // trade fields
       client_issue:           edited.client_issue           ?? null,
       diagnostic_findings:    edited.diagnostic_findings    ?? null,
       materials_used:         edited.materials_used         ?? null,
       recommended_next_steps: edited.recommended_next_steps ?? null,
       createdAt: new Date().toISOString(),
     };
-
     const updated = [entry, ...logs];
     setLogs(updated);
     lsSet("logit_logs", JSON.stringify(updated));
-
     const nextUsage = usage + 1;
     setUsage(nextUsage);
     lsSet("logit_monthly_usage", String(nextUsage));
-
     discard();
     setTab("home");
     showToast("✓ Log saved");
@@ -226,34 +235,31 @@ export default function Page() {
     showToast("Log deleted");
   }
 
-  // ── Copy-to-clipboard text builder ────────────────────────────────────
+  // ── Copy text builder ──────────────────────────────────────────────────────
   function buildCopyText(log) {
-    const catLabel = appConfig.cats[log.category]?.label ?? log.category;
+    const catLabel = activeConfig.cats[log.category]?.label ?? log.category;
     const date     = new Date(log.createdAt).toLocaleString();
 
     if (IS_TRADE) {
       return [
-        appConfig.logExportHeader, "─".repeat(40),
-        `Category:   ${catLabel}`,
-        `Date/Time:  ${date}`, "",
+        activeConfig.logExportHeader, "─".repeat(40),
+        `Category:   ${catLabel}`, `Date/Time:  ${date}`, "",
         "CLIENT ISSUE",        log.client_issue    ?? log.description, "",
         "DIAGNOSTIC FINDINGS", log.diagnostic_findings ?? "",          "",
         "WORK PERFORMED",      log.action_taken    ?? "",              "",
         "MATERIALS USED",      log.materials_used  ?? "",              "",
         "NEXT STEPS",          log.recommended_next_steps ?? log.follow_up, "",
-        "─".repeat(40), appConfig.logExportFooter,
+        "─".repeat(40), activeConfig.logExportFooter,
       ].join("\n");
     }
-
     return [
-      appConfig.logExportHeader, "─".repeat(40),
-      `Category:   ${catLabel}`,
-      `Date/Time:  ${date}`, "",
-      "SUMMARY",     log.summary,    "",
-      "DESCRIPTION", log.description, "",
+      activeConfig.logExportHeader, "─".repeat(40),
+      `Category:   ${catLabel}`, `Date/Time:  ${date}`, "",
+      "SUMMARY",      log.summary,      "",
+      "DESCRIPTION",  log.description,  "",
       "ACTION TAKEN", log.action_taken, "",
-      "FOLLOW-UP",   log.follow_up,   "",
-      "─".repeat(40), appConfig.logExportFooter,
+      "FOLLOW-UP",    log.follow_up,    "",
+      "─".repeat(40), activeConfig.logExportFooter,
     ].join("\n");
   }
 
@@ -294,116 +300,132 @@ export default function Page() {
     setTab(id);
   }
 
-  // ── Derived display flags ──────────────────────────────────────────────
-  const isRecording   = recorder.isRecording;
-  const showResult    = phase === "result" && edited !== null;
-  const showProcessing = phase === "processing";
+  // ── Dev mode toggle ─────────────────────────────────────────────────────────
+  function handleModeToggle() {
+    setActiveMode((prev) => (prev === "trade" ? "educator" : "trade"));
+    // Reset logs filter state when swapping modes so category pills don't
+    // show invalid values from the previous mode's category list.
+    setTab("home");
+    discard();
+  }
 
-  // Shell goes dark when on any screen except the educator home tab.
-  const isDark =
-    IS_TRADE || tab !== "home" || showResult || showProcessing || isRecording;
+  // ── Derived display flags ──────────────────────────────────────────────────
+  const isRecording    = recorder.isRecording;
+  const showResult     = phase === "result" && edited !== null;
+  const showProcessing = phase === "processing";
+  const isDark         = IS_TRADE || tab !== "home" || showResult || showProcessing || isRecording;
 
   return (
-    <div
-      className={`min-h-screen flex items-start justify-center p-4 sm:p-8 sm:items-center ${
-        IS_TRADE ? "bg-zinc-950" : "bg-slate-100"
-      }`}
-    >
-      {/* ── Phone shell ── */}
+    <ModeContext.Provider value={activeConfig}>
       <div
-        className={`w-full max-w-sm flex flex-col relative overflow-hidden rounded-[2.75rem] transition-colors duration-300 ${
-          isDark
-            ? "bg-[#111118] border border-white/8"
-            : "bg-white border border-slate-200"
+        className={`min-h-screen flex items-start justify-center p-4 sm:p-8 sm:items-center ${
+          IS_TRADE ? "bg-zinc-950" : "bg-slate-100"
         }`}
-        style={{ minHeight: "780px" }}
       >
-        <StatusBar isDark={isDark} usage={mounted ? usage : 0} />
+        {/* ── Phone shell ── */}
+        <div
+          className={`w-full max-w-sm flex flex-col relative overflow-hidden rounded-[2.75rem] transition-colors duration-300 ${
+            isDark
+              ? "bg-[#111118] border border-white/8"
+              : "bg-white border border-slate-200"
+          }`}
+          style={{ minHeight: "780px" }}
+        >
+          <StatusBar isDark={isDark} usage={mounted ? usage : 0} />
 
-        {/* Recorder permission / hardware error */}
-        {recorder.error && !isRecording && (
-          <div className="mx-5 mt-2 mb-0 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-[12px] text-red-700 leading-relaxed flex-shrink-0">
-            {recorder.error}
-          </div>
-        )}
+          {recorder.error && !isRecording && (
+            <div className="mx-5 mt-2 mb-0 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-[12px] text-red-700 leading-relaxed flex-shrink-0">
+              {recorder.error}
+            </div>
+          )}
 
-        {/* ── Full-height overlays ── */}
-        {showResult && (
-          <ResultScreen
-            result={edited}
-            onFieldChange={(key, val) =>
-              setEdited((prev) => ({ ...prev, [key]: val }))
-            }
-            onCategoryChange={(cat) =>
-              setEdited((prev) => ({ ...prev, category: cat }))
-            }
-            onSave={saveLog}
-            onDiscard={discard}
-            onCopy={copyEdited}
-            aiError={aiError}
-          />
-        )}
+          {/* ── Full-height overlays ── */}
+          {showResult && (
+            <ResultScreen
+              result={edited}
+              onFieldChange={(key, val) => setEdited((prev) => ({ ...prev, [key]: val }))}
+              onCategoryChange={(cat) => setEdited((prev) => ({ ...prev, category: cat }))}
+              onSave={saveLog}
+              onDiscard={discard}
+              onCopy={copyEdited}
+              aiError={aiError}
+            />
+          )}
 
-        {showProcessing && <ProcessingOverlay />}
+          {showProcessing && <ProcessingOverlay />}
 
-        {isRecording && (
-          <RecordingScreen
-            isRecording
-            recordingSeconds={recorder.recordingSeconds}
-            onStop={recorder.stopRecording}
-          />
-        )}
+          {isRecording && (
+            <RecordingScreen
+              isRecording
+              recordingSeconds={recorder.recordingSeconds}
+              onStop={recorder.stopRecording}
+            />
+          )}
 
-        {/* ── Tab content (hidden when any overlay is active) ── */}
-        {!showResult && !showProcessing && !isRecording && (
-          <>
-            {tab === "home" && (
-              <HomeScreen
-                logs={mounted ? logs : []}
-                usage={mounted ? usage : 0}
-                freeLimit={FREE_LIMIT}
-                district={district}
-                onDistrictChange={handleDistrictChange}
-                onStartLogging={handleStartRecording}
-              />
-            )}
-            {tab === "record" && (
-              <RecordingScreen
-                isRecording={false}
-                recordingSeconds={0}
-                onStart={handleStartRecording}
-                onStop={recorder.stopRecording}
-              />
-            )}
-            {tab === "logs" && (
-              <LogsScreen
-                logs={mounted ? logs : []}
-                onDelete={deleteLog}
-                onCopy={copyLog}
-              />
-            )}
-          </>
-        )}
+          {/* ── Tab content ── */}
+          {!showResult && !showProcessing && !isRecording && (
+            <>
+              {tab === "home" && (
+                <HomeScreen
+                  logs={mounted ? logs : []}
+                  usage={mounted ? usage : 0}
+                  freeLimit={FREE_LIMIT}
+                  district={district}
+                  onDistrictChange={handleDistrictChange}
+                  onStartLogging={handleStartRecording}
+                  onModeToggle={handleModeToggle}
+                />
+              )}
+              {tab === "record" && (
+                <RecordingScreen
+                  isRecording={false}
+                  recordingSeconds={0}
+                  onStart={handleStartRecording}
+                  onStop={recorder.stopRecording}
+                />
+              )}
+              {tab === "logs" && (
+                <LogsScreen
+                  logs={mounted ? logs : []}
+                  onDelete={deleteLog}
+                  onCopy={copyLog}
+                />
+              )}
+            </>
+          )}
 
-        {/* ── Tab bar (hidden only during active recording or processing) ── */}
-        {!isRecording && !showProcessing && (
-          <TabBar
-            activeTab={tab}
-            isDark={isDark || showResult}
-            onTabChange={handleTabChange}
-          />
-        )}
+          {/* ── Tab bar ── */}
+          {!isRecording && !showProcessing && (
+            <TabBar
+              activeTab={tab}
+              isDark={isDark || showResult}
+              tabs={TABS}
+              onTabChange={handleTabChange}
+            />
+          )}
 
-        {/* ── Toast ── */}
-        {toast && (
-          <div
-            className="absolute bottom-20 left-1/2 px-5 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-[12px] text-white whitespace-nowrap z-20 pointer-events-none"
-            style={{ animation: "toastIn 0.25s ease", transform: "translateX(-50%)" }}
-          >
-            {toast}
-          </div>
-        )}
+          {/* ── Toast ── */}
+          {toast && (
+            <div
+              className="absolute bottom-20 left-1/2 px-5 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-[12px] text-white whitespace-nowrap z-20 pointer-events-none"
+              style={{ animation: "toastIn 0.25s ease", transform: "translateX(-50%)" }}
+            >
+              {toast}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </ModeContext.Provider>
+  );
+}
+
+// ── Page export — wraps AppShell in Suspense so useSearchParams is allowed ───
+// Next.js requires a Suspense boundary around any component that calls
+// useSearchParams() when the page could be statically rendered.
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <AppShell />
+    </Suspense>
   );
 }

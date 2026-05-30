@@ -1,9 +1,6 @@
 "use client";
 
-import appConfig from "@/config/appConfig";
-
-const IS_TRADE = process.env.NEXT_PUBLIC_APP_MODE === "trade";
-const { colors } = appConfig;
+import { useModeConfig } from "@/context/ModeContext";
 
 function fmt(s) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -26,6 +23,9 @@ export default function RecordingScreen({
   onStart,
   onStop,
 }) {
+  const config = useModeConfig();
+  const IS_TRADE = config.appMode === "trade";
+  const { colors } = config;
   // ── Idle: mic button with concentric rings ──────────────────────────────
   if (!isRecording) {
     return (
