@@ -1,6 +1,7 @@
 "use client";
 
 import { useModeConfig } from "@/context/ModeContext";
+import PhotoStrip from "@/components/PhotoStrip";
 
 function fieldLabel(key) {
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -43,7 +44,8 @@ function TradeCopyPanel({ label, value, accent }) {
 }
 
 // ── Educator: collapsible district form section ─────────────────────────────
-function DistrictForms({ result }) {
+// districtForms passed as prop to avoid free-variable scoping bug
+function DistrictForms({ result, districtForms }) {
   const sections = districtForms?.[result?.districtId] ?? [];
   if (!sections.length) return null;
 
@@ -97,14 +99,30 @@ export default function ResultScreen({
   onSave,
   onDiscard,
   onCopy,
+  onShare,
+  photos,
+  onAddPhoto,
+  onRemovePhoto,
   aiError,
 }) {
   const config = useModeConfig();
   const IS_TRADE = config.appMode === "trade";
-  const { colors, cats, resultFields, districtForms } = config;
+  const {
+    colors,
+    cats,
+    resultFields,
+    districtForms,
+    metadataField,
+    tradeSummaryFields,
+    customerShare,
+  } = config;
 
   if (!result) return null;
   const cat = cats[result.category];
+
+  // Resolve "primary"/"secondary" accent tokens to mode colors.
+  const resolveAccent = (a) =>
+    a === "primary" ? colors.primary : a === "secondary" ? colors.secondary : a;
 
   return (
     <div className="flex-1 flex flex-col bg-[#111118] overflow-hidden">
@@ -138,6 +156,56 @@ export default function ResultScreen({
         style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.2) transparent" }}
       >
 
+        {/* Typed job metadata — trade only, keeps identifiers out of audio */}
+        {metadataField && (
+          <div className="border-t border-white/6 py-3">
+            <div className="text-[9px] font-mono uppercase tracking-wider text-white/25 mb-1.5">
+              {metadataField.label}
+            </div>
+            <input
+              type="text"
+              className="w-full bg-white/[0.04] border border-white/8 rounded-lg px-3 py-2 outline-none text-[13px] text-white/75 placeholder:text-white/20 font-sans focus:border-white/20 transition-colors"
+              placeholder={metadataField.placeholder}
+              value={result[metadataField.key] ?? ""}
+              onChange={(e) => onFieldChange(metadataField.key, e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Trip notes — trade only, optional typed annotation for mileage/fuel cost */}
+        {IS_TRADE && (
+          <div className="border-t border-white/6 py-3">
+            <div className="text-[9px] font-mono uppercase tracking-wider text-white/25 mb-1.5">
+              Trip Notes (optional)
+            </div>
+            <input
+              type="text"
+              className="w-full bg-white/[0.04] border border-white/8 rounded-lg px-3 py-2 outline-none text-[13px] text-white/75 placeholder:text-white/20 font-sans focus:border-white/20 transition-colors"
+              placeholder="Mileage, fuel cost, tolls…"
+              value={result.trip_notes ?? ""}
+              onChange={(e) => onFieldChange("trip_notes", e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Photos — trade only (wired via props) */}
+        {IS_TRADE && onAddPhoto && (
+          <div className="border-t border-white/6 py-3">
+            <div className="text-[9px] font-mono uppercase tracking-wider text-white/25 mb-2">
+              Job Photos
+            </div>
+            <PhotoStrip
+              photos={photos}
+              onAdd={onAddPhoto}
+              onRemove={onRemovePhoto}
+              accent={colors.primary}
+            />
+            <p className="text-[9px] text-white/20 mt-1.5">
+              Stored on this device only · before/after shots recommended
+            </p>
+          </div>
+        )}
+
         {/* Standard editable fields */}
         {resultFields.map(({ label, key, rows }) => (
           <div key={key} className="border-t border-white/6 py-3">
@@ -160,7 +228,7 @@ export default function ResultScreen({
           </div>
           <select
             className="w-full bg-transparent border-none outline-none text-[13px] text-white/65 font-sans cursor-pointer"
-            value={result.category ?? appConfig.defaultCategory}
+            value={result.category ?? config.defaultCategory}
             onChange={(e) => onCategoryChange(e.target.value)}
           >
             {Object.entries(cats).map(([k, v]) => (
@@ -171,46 +239,52 @@ export default function ResultScreen({
           </select>
         </div>
 
-        {/* Trade: quick-copy field panels */}
-        {IS_TRADE && (
+        {/* Trade: quick-copy field panels (driven by config) */}
+        {IS_TRADE && tradeSummaryFields && (
           <div className="border-t border-white/6 pt-4 pb-2">
             <div className="text-[9px] font-mono uppercase tracking-wider text-white/25 mb-3">
               Field Service Summary
             </div>
-            {[
-              { label: "Client Issue",            key: "client_issue",           accent: colors.primary   },
-              { label: "Diagnostic Findings",     key: "diagnostic_findings",    accent: colors.secondary },
-              { label: "Materials Used",          key: "materials_used",         accent: "#2D9E75"        },
-              { label: "Recommended Next Steps",  key: "recommended_next_steps", accent: "#C9A84C"        },
-            ].map(({ label, key, accent }) => (
+            {tradeSummaryFields.map(({ label, key, accent }) => (
               <TradeCopyPanel
                 key={key}
                 label={label}
                 value={result[key] ?? ""}
-                accent={accent}
+                accent={resolveAccent(accent)}
               />
             ))}
           </div>
         )}
 
         {/* Educator: district form accordions */}
-        {!IS_TRADE && <DistrictForms result={result} />}
+        {!IS_TRADE && (
+          <DistrictForms result={result} districtForms={districtForms} />
+        )}
 
       </div>
 
       {/* ── Privacy footer ── */}
       <p className="text-center text-[10px] text-white/15 py-2 px-6 flex-shrink-0">
-        {appConfig.privacyFooter}
+        {config.privacyFooter}
       </p>
 
-      {/* ── Copy for portal ── */}
-      <div className="px-6 pb-1 flex-shrink-0">
+      {/* ── Copy for portal / Send to customer ── */}
+      <div className="px-6 pb-1 flex-shrink-0 flex gap-2">
         <button
           onClick={onCopy}
-          className="w-full py-3 rounded-2xl bg-white text-[#0A0A0F] font-bold text-[13px] hover:opacity-90 active:opacity-80 transition-opacity"
+          className="flex-1 py-3 rounded-2xl bg-white text-[#0A0A0F] font-bold text-[13px] hover:opacity-90 active:opacity-80 transition-opacity"
         >
-          {appConfig.copyPortalLabel}
+          {config.copyPortalLabel}
         </button>
+        {IS_TRADE && customerShare && onShare && (
+          <button
+            onClick={() => onShare(result)}
+            className="flex-1 py-3 rounded-2xl font-bold text-[13px] text-white hover:opacity-90 active:opacity-80 transition-opacity"
+            style={{ background: colors.secondary }}
+          >
+            {customerShare.buttonLabel}
+          </button>
+        )}
       </div>
 
       {/* ── Save / Discard ── */}

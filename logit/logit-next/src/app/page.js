@@ -11,8 +11,9 @@ import ResultScreen from "@/components/ResultScreen";
 import LogsScreen from "@/components/LogsScreen";
 import VehicleLogScreen from "@/components/VehicleLogScreen";
 
-const BUILD_MODE  = process.env.NEXT_PUBLIC_APP_MODE || "educator";
-const FREE_LIMIT  = 10;
+const BUILD_MODE = process.env.NEXT_PUBLIC_APP_MODE || "educator";
+const IS_DEV     = process.env.NODE_ENV === "development";
+const FREE_LIMIT = 10;
 
 // ── localStorage helpers ─────────────────────────────────────────────────────
 function lsGet(key, fallback = null) {
@@ -419,7 +420,7 @@ function AppShell() {
                   district={district}
                   onDistrictChange={handleDistrictChange}
                   onStartLogging={handleStartRecording}
-                  onModeToggle={handleModeToggle}
+                  onModeToggle={IS_DEV ? handleModeToggle : undefined}
                 />
               )}
               {tab === "record" && (

@@ -165,7 +165,7 @@ Category guidance:
 - maintenance: scheduled PM visit, inspection, flush, filter change, annual service
 - parts_order: job paused waiting on parts; supply house order placed or needed
 
-Client privacy rule: never include client full names; use "the client" or "the customer".
+Preserve all client names, addresses, and identifying details exactly as spoken — they are needed for invoicing, callbacks, and dispute resolution.
 
 Return ONLY valid JSON. No markdown fences, no explanation, no text outside the JSON.
 

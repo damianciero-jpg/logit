@@ -10,6 +10,7 @@ export default function HomeScreen({
   onDistrictChange,
   onStartLogging,
   onModeToggle,
+  onUpgradeTap,
 }) {
   const config = useModeConfig();
   const IS_TRADE = config.appMode === "trade";
@@ -18,6 +19,8 @@ export default function HomeScreen({
   const lastLog = logs[0] ?? null;
   const usagePct = Math.min((usage / freeLimit) * 100, 100);
   const daysLeft = 30 - new Date().getDate();
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const jobsThisWeek = logs.filter((l) => new Date(l.createdAt) >= weekAgo).length;
   const atLimit = usage >= freeLimit;
 
   // Theme shorthands
@@ -37,7 +40,7 @@ export default function HomeScreen({
             className="text-[10px] font-mono uppercase tracking-widest mb-2"
             style={{ color: colors.primary }}
           >
-            {appConfig.tagline}
+            {config.tagline}
           </p>
           <h2 className={`text-[17px] font-bold leading-snug tracking-tight mb-2 ${textPri}`}>
             {IS_TRADE
@@ -74,13 +77,21 @@ export default function HomeScreen({
               }}
             />
           </div>
-          <p className={`text-[10px] mt-1.5 ${textMute}`}>
-            {atLimit
-              ? "Limit reached — upgrade for unlimited logs"
-              : `Resets in ${daysLeft} day${daysLeft !== 1 ? "s" : ""} · ${
-                  freeLimit - usage
-                } remaining`}
-          </p>
+          {atLimit ? (
+            <button
+              onClick={onUpgradeTap}
+              className="text-[10px] mt-1.5 font-semibold underline underline-offset-2 text-left"
+              style={{ color: colors.primary }}
+            >
+              Limit reached — get unlimited logs →
+            </button>
+          ) : (
+            <p className={`text-[10px] mt-1.5 ${textMute}`}>
+              {`Resets in ${daysLeft} day${daysLeft !== 1 ? "s" : ""} · ${
+                freeLimit - usage
+              } remaining`}
+            </p>
+          )}
         </div>
 
         {/* ── Last log card ── */}
@@ -142,35 +153,33 @@ export default function HomeScreen({
           </div>
         )}
 
-        {/* ── Client privacy — trade only ── */}
+        {/* ── Quick stats + Truck shortcut — trade only ── */}
         {IS_TRADE && (
-          <div className={`py-5 border-b ${border}`}>
+          <div className={`py-4 border-b ${border}`}>
+            <div className="flex items-center justify-between mb-3">
+              <span className={`text-[9px] font-mono uppercase tracking-widest ${textMute}`}>
+                This week
+              </span>
+              <span className={`text-[12px] font-mono ${textPri}`}>
+                {jobsThisWeek} job{jobsThisWeek !== 1 ? "s" : ""} logged
+              </span>
+            </div>
             <div
-              className="rounded-xl p-4"
-              style={{
-                background: `${colors.primary}10`,
-                border: `1px solid ${colors.primary}28`,
-              }}
+              className="rounded-xl px-3.5 py-2.5 flex items-center justify-between"
+              style={{ background: `${colors.primary}0d`, border: `1px solid ${colors.primary}22` }}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm">🔒</span>
-                <span
-                  className="text-[10px] font-mono uppercase tracking-wider"
-                  style={{ color: colors.primary }}
-                >
-                  Client Privacy
-                </span>
-              </div>
-              <p className="text-[11px] text-white/50 leading-relaxed">
-                Never include full client names or addresses in recordings. Use "the
-                client" or general references. All job logs stored locally on this
-                device.
-              </p>
+              <span className="text-[11px] text-white/45">
+                🚛 Mileage, fuel, or maintenance?
+              </span>
+              <span className="text-[10px] font-semibold" style={{ color: colors.primary }}>
+                Truck tab →
+              </span>
             </div>
           </div>
         )}
 
-        {/* ── District / Region picker ── */}
+        {/* ── District / Region picker — educator only ── */}
+        {!IS_TRADE && (
         <div className={`py-5 border-b ${border}`}>
           <p className={`text-[9px] font-mono uppercase tracking-widest mb-3 ${textMute}`}>
             {IS_TRADE ? "Service Region" : "My District Form"}
@@ -234,16 +243,11 @@ export default function HomeScreen({
           </div>
           <p className={`text-[10px] mt-2 ${textMute}`}>
             {district === "none"
-              ? IS_TRADE
-                ? "Select your service region type."
-                : "Select your district to auto-generate matching forms."
-              : IS_TRADE
-                ? `Logging as: ${districts.find((d) => d.id === district)?.label}`
-                : `Forms will generate for ${
-                    districts.find((d) => d.id === district)?.label
-                  }.`}
+              ? "Select your district to auto-generate matching forms."
+              : `Forms will generate for ${districts.find((d) => d.id === district)?.label}.`}
           </p>
         </div>
+        )}
 
         {/* ── How it works ── */}
         <div className={`py-5 border-b ${border}`}>
@@ -277,6 +281,11 @@ export default function HomeScreen({
           >
             {config.ctaLabel}
           </button>
+          {IS_TRADE && (
+            <p className={`text-[10px] text-center mt-2 ${textMute}`}>
+              Logs a job — vehicle &amp; mileage entries live in the Truck tab
+            </p>
+          )}
         </div>
 
         {/* ── Footer ── */}
