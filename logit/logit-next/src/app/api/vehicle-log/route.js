@@ -3,6 +3,16 @@
 // Returns a JSON draft with type-specific fields pre-filled for the form.
 
 export async function POST(req) {
+  // ── API key guards ─────────────────────────────────────────────────────────
+  if (!process.env.GROQ_API_KEY) {
+    console.error("[vehicle-log] GROQ_API_KEY is not set");
+    return Response.json({ error: "Server misconfiguration: GROQ_API_KEY not set" }, { status: 500 });
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error("[vehicle-log] ANTHROPIC_API_KEY is not set");
+    return Response.json({ error: "Server misconfiguration: ANTHROPIC_API_KEY not set" }, { status: 500 });
+  }
+
   let formData;
   try {
     formData = await req.formData();
@@ -15,11 +25,19 @@ export async function POST(req) {
     return Response.json({ error: "No audio file" }, { status: 400 });
   }
 
+  console.log("[vehicle-log] audio received — size:", audio.size, "type:", audio.type);
+
   // ── Step 1: Whisper transcription via Groq ────────────────────────────────
+  // Use the actual mime type to pick the right filename extension so Groq can
+  // identify the format correctly (Safari sends MP4, Chrome sends WebM).
+  const ext = audio.type?.includes("mp4") ? "mp4"
+    : audio.type?.includes("ogg") ? "ogg"
+    : "webm";
+
   let transcript = "";
   try {
     const whisperForm = new FormData();
-    whisperForm.append("file", audio, "recording.webm");
+    whisperForm.append("file", audio, `recording.${ext}`);
     whisperForm.append("model", "whisper-large-v3");
 
     const whisperRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
@@ -28,14 +46,22 @@ export async function POST(req) {
       body: whisperForm,
     });
 
-    if (!whisperRes.ok) throw new Error("Whisper failed");
+    console.log("[vehicle-log] Whisper status:", whisperRes.status);
+    if (!whisperRes.ok) {
+      const errBody = await whisperRes.text().catch(() => whisperRes.statusText);
+      console.error("[vehicle-log] Whisper error body:", errBody);
+      throw new Error(`Whisper ${whisperRes.status}: ${errBody}`);
+    }
+
     const whisperData = await whisperRes.json();
-    transcript = whisperData.text ?? "";
-  } catch {
+    transcript = (whisperData.text ?? "").trim();
+    console.log("[vehicle-log] transcript:", transcript);
+  } catch (err) {
+    console.error("[vehicle-log] transcription error:", err.message);
     return Response.json({ error: "Transcription failed" }, { status: 500 });
   }
 
-  if (!transcript.trim()) {
+  if (!transcript) {
     return Response.json({ error: "No speech detected" }, { status: 400 });
   }
 
@@ -86,15 +112,22 @@ Rules:
       }),
     });
 
-    if (!aiRes.ok) throw new Error("Claude failed");
+    console.log("[vehicle-log] Claude status:", aiRes.status);
+    if (!aiRes.ok) {
+      const errBody = await aiRes.text().catch(() => aiRes.statusText);
+      console.error("[vehicle-log] Claude error body:", errBody);
+      throw new Error(`Claude ${aiRes.status}: ${errBody}`);
+    }
+
     const aiData = await aiRes.json();
     const raw = aiData.content?.[0]?.text ?? "{}";
     const clean = raw.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
 
     return Response.json({ ...parsed, transcript });
-  } catch {
-    // Return transcript only so the form can be filled manually.
+  } catch (err) {
+    console.error("[vehicle-log] Claude extraction error:", err.message);
+    // Return transcript so the client can still show something useful.
     return Response.json({ transcript, aiError: true });
   }
 }

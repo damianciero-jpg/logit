@@ -201,18 +201,21 @@ function AppShell() {
   // ── Vehicle-log voice pipeline ────────────────────────────────────────────
   async function processVehicleAudio(blob) {
     setVehiclePhase("processing");
+    const ext = blob.type?.includes("mp4") ? "mp4" : blob.type?.includes("ogg") ? "ogg" : "webm";
     const fd = new FormData();
-    fd.append("audio", blob, "recording.webm");
+    fd.append("audio", blob, `recording.${ext}`);
     try {
       const res  = await fetch("/api/vehicle-log", { method: "POST", body: fd });
       const data = await res.json();
+      console.log("[vehicle-log] response status:", res.status, "body:", data);
       if (data.error) {
-        showToast("Processing failed — fill in the form manually.");
+        showToast("Couldn't auto-fill — fill the form manually.");
       } else {
         setVehicleAiDraft(data);
       }
-    } catch {
-      showToast("Network error — fill in the form manually.");
+    } catch (err) {
+      console.error("[vehicle-log] client fetch error:", err);
+      showToast("Network error — fill the form manually.");
     }
     setVehiclePhase("idle");
   }
@@ -327,14 +330,19 @@ function AppShell() {
     lsSet("logit_district", id);
   }
 
-  async function handleStartRecording() {
+  // Home CTA — navigate to idle RecordingScreen; mic tap there actually starts.
+  function handleNavigateToRecord() {
     if (usage >= FREE_LIMIT) {
       showToast(`Free limit of ${FREE_LIMIT} reached.`);
       return;
     }
     setRecordingFor("job");
-    await recorder.startRecording();
     setTab("record");
+  }
+
+  // Called by the mic button on the idle RecordingScreen.
+  async function handleStartRecording() {
+    await recorder.startRecording();
   }
 
   async function handleStartVehicleRecording() {
@@ -419,7 +427,7 @@ function AppShell() {
                   freeLimit={FREE_LIMIT}
                   district={district}
                   onDistrictChange={handleDistrictChange}
-                  onStartLogging={handleStartRecording}
+                  onStartLogging={handleNavigateToRecord}
                   onModeToggle={IS_DEV ? handleModeToggle : undefined}
                 />
               )}

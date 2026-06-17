@@ -1,12 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useModeConfig } from "@/context/ModeContext";
 
 // ─── VEHICLE LOG SCREEN ────────────────────────────────────────────────────────
-// Separate tab for owner-operators to log truck mileage, fuel, and maintenance.
-// Flow: tap mic → speak → AI pre-fills typed fields → review/edit → save.
-// Falls back to blank typed form if voice is skipped.
 
 const ENTRY_TYPES = [
   { id: "mileage",     label: "Mileage",      icon: "🛣️"  },
@@ -38,7 +35,7 @@ function TextInput({ value, onChange, placeholder, type = "text", inputMode }) {
   );
 }
 
-// ── Mic button (same ring aesthetic as RecordingScreen) ───────────────────────
+// ── Mic button ────────────────────────────────────────────────────────────────
 function MicTrigger({ onStart, colors }) {
   return (
     <div
@@ -60,8 +57,8 @@ function MicTrigger({ onStart, colors }) {
           🎙️
         </button>
       </div>
-      <p className="text-[13px] text-white/25">Tap to speak your vehicle log</p>
-      <p className="text-[11px] text-white/15 mt-1">or fill the form below</p>
+      <p className="text-[13px] text-white/45">Tap to speak your vehicle log</p>
+      <p className="text-[11px] text-white/30 mt-1">or fill the form below</p>
     </div>
   );
 }
@@ -92,6 +89,40 @@ function RecordingBar({ seconds, onStop, colors }) {
   );
 }
 
+// ── This Week stats row ───────────────────────────────────────────────────────
+function WeekStats({ vehicleLogs, colors, onSelectType }) {
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const counts = { mileage: 0, fuel: 0, maintenance: 0 };
+  vehicleLogs.forEach((l) => {
+    if (new Date(l.createdAt) >= weekAgo && counts[l.type] !== undefined) {
+      counts[l.type]++;
+    }
+  });
+  return (
+    <div className="px-6 pb-4 flex-shrink-0 border-b border-white/6">
+      <p className="text-[9px] font-mono uppercase tracking-widest text-white/25 mb-2">
+        This week
+      </p>
+      <div className="flex gap-2">
+        {ENTRY_TYPES.map(({ id, label, icon }) => (
+          <button
+            key={id}
+            onClick={() => onSelectType(id)}
+            className="flex-1 flex flex-col items-center py-2 rounded-xl border border-white/8 active:opacity-80 active:scale-95 transition-all cursor-pointer"
+            style={{ background: "rgba(255,255,255,0.03)" }}
+          >
+            <span className="text-[13px] leading-none mb-0.5">{icon}</span>
+            <span className="text-[11px] font-mono tabular-nums" style={{ color: colors.primary }}>
+              {counts[id]}
+            </span>
+            <span className="text-[9px] text-white/30 mt-0.5">{label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function VehicleLogScreen({
   vehicleLogs,
@@ -99,7 +130,7 @@ export default function VehicleLogScreen({
   recordingSeconds,
   onStartRecording,
   onStopRecording,
-  aiDraft,           // pre-filled fields from voice → AI, or null
+  aiDraft,
   onClearDraft,
   onSaveVehicleLog,
   onDeleteVehicleLog,
@@ -108,29 +139,51 @@ export default function VehicleLogScreen({
   const config = useModeConfig();
   const { colors } = config;
 
-  // Form state — seeded from AI draft when available
-  const [type,      setType]      = useState(aiDraft?.type      ?? "mileage");
-  const [vehicle,   setVehicle]   = useState(aiDraft?.vehicle   ?? "");
-  const [date,      setDate]      = useState(aiDraft?.date      ?? new Date().toISOString().slice(0, 10));
-  // Mileage
-  const [odomIn,    setOdomIn]    = useState(aiDraft?.odometer_start ?? "");
-  const [odomOut,   setOdomOut]   = useState(aiDraft?.odometer_end   ?? "");
-  const [purpose,   setPurpose]   = useState(aiDraft?.purpose         ?? "");
-  // Fuel
-  const [gallons,   setGallons]   = useState(aiDraft?.gallons   ?? "");
-  const [fuelCost,  setFuelCost]  = useState(aiDraft?.fuel_cost ?? "");
-  const [station,   setStation]   = useState(aiDraft?.station   ?? "");
-  // Maintenance
-  const [workDone,  setWorkDone]  = useState(aiDraft?.work_done  ?? "");
-  const [partsCost, setPartsCost] = useState(aiDraft?.parts_cost ?? "");
-  const [laborCost, setLaborCost] = useState(aiDraft?.labor_cost ?? "");
-  const [shopName,  setShopName]  = useState(aiDraft?.shop_name  ?? "");
-  const [notes,     setNotes]     = useState(aiDraft?.notes      ?? "");
+  // Form state
+  const [type,      setType]      = useState("mileage");
+  const [vehicle,   setVehicle]   = useState("");
+  const [date,      setDate]      = useState(new Date().toISOString().slice(0, 10));
+  const [odomIn,    setOdomIn]    = useState("");
+  const [odomOut,   setOdomOut]   = useState("");
+  const [purpose,   setPurpose]   = useState("");
+  const [gallons,   setGallons]   = useState("");
+  const [fuelCost,  setFuelCost]  = useState("");
+  const [station,   setStation]   = useState("");
+  const [workDone,  setWorkDone]  = useState("");
+  const [partsCost, setPartsCost] = useState("");
+  const [laborCost, setLaborCost] = useState("");
+  const [shopName,  setShopName]  = useState("");
+  const [notes,     setNotes]     = useState("");
 
   // UI state
-  const [view, setView] = useState("form"); // "form" | "history"
+  const [view, setView] = useState("form");
 
-  // Computed mileage
+  // ── Sync form fields when AI draft arrives asynchronously (1f fix) ─────────
+  useEffect(() => {
+    if (!aiDraft) return;
+    setType(aiDraft.type      ?? "mileage");
+    setVehicle(aiDraft.vehicle ?? "");
+    if (aiDraft.date) setDate(aiDraft.date);
+    setOdomIn(aiDraft.odometer_start ?? "");
+    setOdomOut(aiDraft.odometer_end  ?? "");
+    setPurpose(aiDraft.purpose       ?? "");
+    setGallons(aiDraft.gallons       ?? "");
+    setFuelCost(aiDraft.fuel_cost    ?? "");
+    setStation(aiDraft.station       ?? "");
+    setWorkDone(aiDraft.work_done    ?? "");
+    setPartsCost(aiDraft.parts_cost  ?? "");
+    setLaborCost(aiDraft.labor_cost  ?? "");
+    setShopName(aiDraft.shop_name    ?? "");
+    setNotes(aiDraft.notes           ?? "");
+    setView("form");
+  }, [aiDraft]);
+
+  // Tapping a This Week stat chip selects the type and shows the form.
+  function handleSelectType(t) {
+    setType(t);
+    setView("form");
+  }
+
   const miles =
     odomIn && odomOut && Number(odomOut) > Number(odomIn)
       ? (Number(odomOut) - Number(odomIn)).toFixed(1)
@@ -151,24 +204,20 @@ export default function VehicleLogScreen({
       vehicle: vehicle.trim() || "Truck",
       date,
       createdAt: new Date().toISOString(),
-      // mileage
-      odometer_start: odomIn  || null,
-      odometer_end:   odomOut || null,
-      miles:          miles   || null,
-      purpose:        purpose || null,
-      // fuel
-      gallons:    gallons   || null,
-      fuel_cost:  fuelCost  || null,
-      station:    station   || null,
-      // maintenance
-      work_done:   workDone  || null,
-      parts_cost:  partsCost || null,
-      labor_cost:  laborCost || null,
-      shop_name:   shopName  || null,
-      notes:       notes     || null,
+      odometer_start: odomIn    || null,
+      odometer_end:   odomOut   || null,
+      miles:          miles     || null,
+      purpose:        purpose   || null,
+      gallons:        gallons   || null,
+      fuel_cost:      fuelCost  || null,
+      station:        station   || null,
+      work_done:      workDone  || null,
+      parts_cost:     partsCost || null,
+      labor_cost:     laborCost || null,
+      shop_name:      shopName  || null,
+      notes:          notes     || null,
     };
 
-    // Basic validation
     const hasData =
       (type === "mileage"     && (odomIn || odomOut || purpose)) ||
       (type === "fuel"        && (gallons || fuelCost)) ||
@@ -245,6 +294,9 @@ export default function VehicleLogScreen({
         </div>
       </div>
 
+      {/* ── This Week stats (always visible) ── */}
+      <WeekStats vehicleLogs={vehicleLogs} colors={colors} onSelectType={handleSelectType} />
+
       {/* ══ FORM VIEW ══════════════════════════════════════════════════════════ */}
       {view === "form" && (
         <div className="flex-1 overflow-y-auto px-6 pb-6" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.15) transparent" }}>
@@ -291,7 +343,7 @@ export default function VehicleLogScreen({
             </div>
           </FieldRow>
 
-          {/* Vehicle name + date — always shown */}
+          {/* Vehicle + date — always shown */}
           <FieldRow label="Vehicle">
             <TextInput value={vehicle} onChange={setVehicle} placeholder="Truck 1, White F-250, Van…" />
           </FieldRow>
@@ -370,7 +422,6 @@ export default function VehicleLogScreen({
             </>
           )}
 
-          {/* Save */}
           <div className="pt-5">
             <button
               onClick={handleSave}
@@ -404,7 +455,6 @@ export default function VehicleLogScreen({
                   key={log.id}
                   className="rounded-xl border border-white/[0.07] p-3.5 mb-2 hover:border-white/[0.14] transition-colors"
                 >
-                  {/* Header row */}
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
                       <span className="text-[13px] leading-none">{t?.icon}</span>
@@ -421,7 +471,6 @@ export default function VehicleLogScreen({
                     <span className="text-[10px] font-mono text-white/20">{log.date}</span>
                   </div>
 
-                  {/* Summary line */}
                   <p className="text-[12px] text-white/55 leading-snug mb-3">
                     {log.type === "mileage" && log.miles
                       ? `${log.miles} mi${log.purpose ? ` · ${log.purpose}` : ""}`
@@ -432,7 +481,6 @@ export default function VehicleLogScreen({
                       : "—"}
                   </p>
 
-                  {/* Cost chips */}
                   {(log.parts_cost || log.labor_cost || log.fuel_cost) && (
                     <div className="flex gap-1.5 mb-3">
                       {log.fuel_cost && (
@@ -453,7 +501,6 @@ export default function VehicleLogScreen({
                     </div>
                   )}
 
-                  {/* Actions */}
                   <div className="flex items-center justify-between">
                     <button
                       onClick={() => copyLog(log)}
