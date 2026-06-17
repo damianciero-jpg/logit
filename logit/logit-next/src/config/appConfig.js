@@ -20,6 +20,7 @@ const configs = {
     privacyNote: "FERPA-Aware",
     ctaLabel: "🎙️ Start Logging",
     emptyLogText: "No logs yet.\nTap Record to create your first log.",
+    recordingHint: "e.g. 'Marcus threw a chair during 3rd period — I separated him from the class, called the office, and sent home a parent contact form.'",
     copyPortalLabel: "Copy for Portal",
     howItWorksSteps: [
       ["Tap and speak", "Describe the incident in plain language. No scripts, no forms."],
@@ -251,6 +252,7 @@ const configs = {
     privacyNote: "Client Data Protected",
     ctaLabel: "🎙️ Start Logging",
     emptyLogText: "No jobs logged yet.\nTap Record to log your first job.",
+    recordingHint: "e.g. 'Replaced the water heater at the Johnson's — found corroded fittings causing the leak, used a 40-gallon Rheem, told them to flush the tank annually.'",
     copyPortalLabel: "Copy for Work Order",
     howItWorksSteps: [
       ["Tap and speak", "Describe the job in plain language. No paperwork, no typing on-site."],

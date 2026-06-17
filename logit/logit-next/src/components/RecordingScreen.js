@@ -57,6 +57,11 @@ export default function RecordingScreen({
         <p className="mt-5 text-[13px] text-white/25 select-none">
           {IS_TRADE ? "Tap to log job" : "Tap to log"}
         </p>
+        {config.recordingHint && (
+          <p className="mt-3 text-[11px] text-white/15 text-center leading-relaxed px-10 select-none">
+            {config.recordingHint}
+          </p>
+        )}
       </div>
     );
   }
