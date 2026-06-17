@@ -49,7 +49,7 @@ export default function HomeScreen({
           </h2>
           <p className={`text-[13px] leading-relaxed ${textMute}`}>
             {IS_TRADE
-              ? "Hands-free job logging for plumbers and field service techs."
+              ? "Hands-free job logging for field service pros."
               : "Built to reduce after-hours paperwork for K–12 educators."}
           </p>
         </div>
