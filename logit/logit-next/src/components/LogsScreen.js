@@ -2,14 +2,38 @@
 
 import { useState } from "react";
 import { useModeConfig } from "@/context/ModeContext";
+import PhotoStrip from "@/components/PhotoStrip";
 
-export default function LogsScreen({ logs, onDelete, onCopy }) {
-  const config  = useModeConfig();
+export default function LogsScreen({
+  logs,
+  onDelete,
+  onCopy,
+  onShare,
+  photoCounts = {},
+  onLoadPhotos,
+}) {
+  const config   = useModeConfig();
   const IS_TRADE = config.appMode === "trade";
-  const { colors, cats, logFilters } = config;
+  const { colors, cats, logFilters, customerShare } = config;
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
+
+  // Photo expansion: which log's photos are open + a cache of loaded urls.
+  const [openPhotoLog, setOpenPhotoLog] = useState(null);
+  const [photoCache,   setPhotoCache]   = useState({});
+
+  async function togglePhotos(logId) {
+    if (openPhotoLog === logId) {
+      setOpenPhotoLog(null);
+      return;
+    }
+    if (!photoCache[logId] && onLoadPhotos) {
+      const loaded = await onLoadPhotos(logId);
+      setPhotoCache((prev) => ({ ...prev, [logId]: loaded }));
+    }
+    setOpenPhotoLog(logId);
+  }
 
   const filtered = logs.filter((log) => {
     const matchesCat = filter === "all" || log.category === filter;
@@ -17,7 +41,8 @@ export default function LogsScreen({ logs, onDelete, onCopy }) {
     const matchesSearch =
       !q ||
       log.summary?.toLowerCase().includes(q) ||
-      log.description?.toLowerCase().includes(q);
+      log.description?.toLowerCase().includes(q) ||
+      log.job_ref?.toLowerCase().includes(q);
     return matchesCat && matchesSearch;
   });
 
@@ -40,7 +65,7 @@ export default function LogsScreen({ logs, onDelete, onCopy }) {
           </span>
           <input
             className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/8 text-white text-[13px] placeholder:text-white/25 outline-none focus:border-white/20 focus:bg-white/[0.08] transition-all font-sans"
-            placeholder={IS_TRADE ? "Search jobs…" : "Search logs…"}
+            placeholder={IS_TRADE ? "Search jobs, job # or street…" : "Search logs…"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -68,10 +93,8 @@ export default function LogsScreen({ logs, onDelete, onCopy }) {
       {logs.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
           <div className="text-4xl mb-3 opacity-30">📋</div>
-          <p className="text-[13px] text-white/20 leading-relaxed">
-            {IS_TRADE
-              ? "No jobs logged yet.\nTap Record to log your first job."
-              : appConfig.emptyLogText}
+          <p className="text-[13px] text-white/20 leading-relaxed whitespace-pre-line">
+            {config.emptyLogText}
           </p>
         </div>
       ) : filtered.length === 0 ? (
@@ -87,19 +110,27 @@ export default function LogsScreen({ logs, onDelete, onCopy }) {
         <div className="flex-1 overflow-y-auto scrollbar-none px-4 pb-4">
           {filtered.map((log) => {
             const c = cats[log.category];
+            const nPhotos = photoCounts[log.id] ?? 0;
             return (
               <div
                 key={log.id}
                 className="rounded-xl border border-white/[0.07] p-3.5 mb-2 hover:border-white/[0.14] transition-colors"
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span
-                    className="text-[10px] font-semibold uppercase tracking-wide"
-                    style={{ color: c?.color ?? colors.primary }}
-                  >
-                    {c?.label ?? log.category}
-                  </span>
-                  <span className="text-[10px] font-mono text-white/20">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0"
+                      style={{ color: c?.color ?? colors.primary }}
+                    >
+                      {c?.label ?? log.category}
+                    </span>
+                    {log.job_ref && (
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] text-white/45 truncate">
+                        {log.job_ref}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-mono text-white/20 flex-shrink-0">
                     {new Date(log.createdAt).toLocaleDateString()}
                   </span>
                 </div>
@@ -108,16 +139,45 @@ export default function LogsScreen({ logs, onDelete, onCopy }) {
                   {log.summary}
                 </p>
 
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={() => onCopy(log)}
-                    className="text-[11px] text-white/30 border border-white/10 rounded-lg px-2.5 py-1 hover:text-white/70 hover:border-white/25 transition-all font-sans"
-                  >
-                    {appConfig.copyPortalLabel}
-                  </button>
+                {/* Expandable photo strip */}
+                {openPhotoLog === log.id && photoCache[log.id]?.length > 0 && (
+                  <div className="mb-3">
+                    <PhotoStrip photos={photoCache[log.id]} />
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <button
+                      onClick={() => onCopy(log)}
+                      className="text-[11px] text-white/30 border border-white/10 rounded-lg px-2.5 py-1 hover:text-white/70 hover:border-white/25 transition-all font-sans whitespace-nowrap"
+                    >
+                      {config.copyPortalLabel}
+                    </button>
+                    {IS_TRADE && customerShare && onShare && (
+                      <button
+                        onClick={() => onShare(log)}
+                        className="text-[11px] border rounded-lg px-2.5 py-1 transition-all font-sans whitespace-nowrap"
+                        style={{
+                          color: colors.secondary,
+                          borderColor: `${colors.secondary}40`,
+                        }}
+                      >
+                        Send
+                      </button>
+                    )}
+                    {nPhotos > 0 && (
+                      <button
+                        onClick={() => togglePhotos(log.id)}
+                        className="text-[11px] text-white/30 border border-white/10 rounded-lg px-2 py-1 hover:text-white/70 hover:border-white/25 transition-all font-sans whitespace-nowrap"
+                      >
+                        📷 {nPhotos}
+                      </button>
+                    )}
+                  </div>
                   <button
                     onClick={() => onDelete(log.id)}
-                    className="text-[11px] text-white/20 hover:text-red-400 px-2 py-1 rounded transition-colors font-sans"
+                    className="text-[11px] text-white/20 hover:text-red-400 px-2 py-1 rounded transition-colors font-sans flex-shrink-0"
                   >
                     Delete
                   </button>
