@@ -9,6 +9,7 @@ import HomeScreen from "@/components/HomeScreen";
 import RecordingScreen from "@/components/RecordingScreen";
 import ResultScreen from "@/components/ResultScreen";
 import LogsScreen from "@/components/LogsScreen";
+import VehicleLogScreen from "@/components/VehicleLogScreen";
 
 const BUILD_MODE  = process.env.NEXT_PUBLIC_APP_MODE || "educator";
 const FREE_LIMIT  = 10;
@@ -113,25 +114,30 @@ function AppShell() {
 
   // Tabs are mode-dependent so derived here, not at module level.
   const TABS = [
-    { id: "home",   icon: "🏠",  label: "Home" },
-    { id: "record", icon: "🎙️", label: IS_TRADE ? "Log Job" : "Record" },
-    { id: "logs",   icon: "📋",  label: IS_TRADE ? "Jobs" : "Logs" },
+    { id: "home",    icon: "🏠",  label: "Home" },
+    { id: "record",  icon: "🎙️", label: IS_TRADE ? "Log Job" : "Record" },
+    { id: "logs",    icon: "📋",  label: IS_TRADE ? "Jobs" : "Logs" },
+    ...(IS_TRADE ? [{ id: "vehicle", icon: "🚛", label: "Truck" }] : []),
   ];
 
   // ── Hydration guard ──
   const [mounted,  setMounted]  = useState(false);
 
   // ── Persistent state ──
-  const [logs,     setLogs]     = useState([]);
-  const [usage,    setUsage]    = useState(0);
-  const [district, setDistrict] = useState("none");
+  const [logs,        setLogs]        = useState([]);
+  const [vehicleLogs, setVehicleLogs] = useState([]);
+  const [usage,       setUsage]       = useState(0);
+  const [district,    setDistrict]    = useState("none");
 
   // ── Session state ──
-  const [tab,     setTab]     = useState("home");
-  const [phase,   setPhase]   = useState("idle");
-  const [edited,  setEdited]  = useState(null);
-  const [aiError, setAiError] = useState("");
-  const [toast,   setToast]   = useState("");
+  const [tab,            setTab]            = useState("home");
+  const [phase,          setPhase]          = useState("idle");
+  const [edited,         setEdited]         = useState(null);
+  const [aiError,        setAiError]        = useState("");
+  const [toast,          setToast]          = useState("");
+  const [recordingFor,   setRecordingFor]   = useState("job"); // "job" | "vehicle"
+  const [vehicleAiDraft, setVehicleAiDraft] = useState(null);
+  const [vehiclePhase,   setVehiclePhase]   = useState("idle"); // "idle" | "processing"
 
   const recorder = useMediaRecorder();
 
@@ -147,14 +153,16 @@ function AppShell() {
       setUsage(parseInt(lsGet("logit_monthly_usage", "0"), 10));
     }
     try { setLogs(JSON.parse(lsGet("logit_logs", "[]"))); } catch { setLogs([]); }
+    try { setVehicleLogs(JSON.parse(lsGet("logit_vehicle_logs", "[]"))); } catch { setVehicleLogs([]); }
     setDistrict(lsGet("logit_district", "none"));
     setMounted(true);
   }, []);
 
-  // ── Send audio blob to API when recording finishes ────────────────────────
+  // ── Send audio blob to the appropriate pipeline when recording finishes ──────
   useEffect(() => {
     if (!recorder.audioBlob) return;
-    processAudio(recorder.audioBlob);
+    if (recordingFor === "vehicle") processVehicleAudio(recorder.audioBlob);
+    else processAudio(recorder.audioBlob);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorder.audioBlob]);
 
@@ -187,6 +195,38 @@ function AppShell() {
       showToast("Network error — please try again.");
       setPhase("idle");
     }
+  }
+
+  // ── Vehicle-log voice pipeline ────────────────────────────────────────────
+  async function processVehicleAudio(blob) {
+    setVehiclePhase("processing");
+    const fd = new FormData();
+    fd.append("audio", blob, "recording.webm");
+    try {
+      const res  = await fetch("/api/vehicle-log", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.error) {
+        showToast("Processing failed — fill in the form manually.");
+      } else {
+        setVehicleAiDraft(data);
+      }
+    } catch {
+      showToast("Network error — fill in the form manually.");
+    }
+    setVehiclePhase("idle");
+  }
+
+  function saveVehicleLog(entry) {
+    const updated = [entry, ...vehicleLogs];
+    setVehicleLogs(updated);
+    lsSet("logit_vehicle_logs", JSON.stringify(updated));
+  }
+
+  function deleteVehicleLog(id) {
+    const updated = vehicleLogs.filter((l) => l.id !== id);
+    setVehicleLogs(updated);
+    lsSet("logit_vehicle_logs", JSON.stringify(updated));
+    showToast("Entry deleted");
   }
 
   // ── Save log ───────────────────────────────────────────────────────────────
@@ -291,8 +331,14 @@ function AppShell() {
       showToast(`Free limit of ${FREE_LIMIT} reached.`);
       return;
     }
+    setRecordingFor("job");
     await recorder.startRecording();
     setTab("record");
+  }
+
+  async function handleStartVehicleRecording() {
+    setRecordingFor("vehicle");
+    await recorder.startRecording();
   }
 
   function handleTabChange(id) {
@@ -313,7 +359,7 @@ function AppShell() {
   const isRecording    = recorder.isRecording;
   const showResult     = phase === "result" && edited !== null;
   const showProcessing = phase === "processing";
-  const isDark         = IS_TRADE || tab !== "home" || showResult || showProcessing || isRecording;
+  const isDark         = IS_TRADE || tab !== "home" || showResult || showProcessing || isRecording || tab === "vehicle";
 
   return (
     <ModeContext.Provider value={activeConfig}>
@@ -389,6 +435,20 @@ function AppShell() {
                   logs={mounted ? logs : []}
                   onDelete={deleteLog}
                   onCopy={copyLog}
+                />
+              )}
+              {tab === "vehicle" && (
+                <VehicleLogScreen
+                  vehicleLogs={mounted ? vehicleLogs : []}
+                  isRecording={recorder.isRecording && recordingFor === "vehicle"}
+                  recordingSeconds={recorder.recordingSeconds}
+                  onStartRecording={handleStartVehicleRecording}
+                  onStopRecording={recorder.stopRecording}
+                  aiDraft={vehicleAiDraft}
+                  onClearDraft={() => setVehicleAiDraft(null)}
+                  onSaveVehicleLog={saveVehicleLog}
+                  onDeleteVehicleLog={deleteVehicleLog}
+                  showToast={showToast}
                 />
               )}
             </>
