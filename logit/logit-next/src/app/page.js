@@ -19,7 +19,7 @@ import {
   compressImage,
 } from "@/lib/photoStore";
 
-const BUILD_MODE = process.env.NEXT_PUBLIC_APP_MODE || "educator";
+const BUILD_MODE = process.env.NEXT_PUBLIC_APP_MODE || "trade";
 const IS_DEV     = process.env.NODE_ENV === "development";
 
 // ── localStorage helpers ─────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ function AppShell() {
     queryMode === "trade" || queryMode === "educator" ? queryMode : BUILD_MODE;
 
   const [activeMode, setActiveMode] = useState(resolvedDefault);
-  const activeConfig = configs[activeMode] ?? configs.educator;
+  const activeConfig = configs[activeMode] ?? configs.trade;
   const IS_TRADE = activeMode === "trade";
 
   // Tabs are mode-dependent so derived here, not at module level.

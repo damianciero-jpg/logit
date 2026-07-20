@@ -419,8 +419,8 @@ const configs = {
 
 // ─── EXPORTS ──────────────────────────────────────────────────────────────────
 
-const mode = process.env.NEXT_PUBLIC_APP_MODE || "educator";
-const appConfig = configs[mode] || configs.educator;
+const mode = process.env.NEXT_PUBLIC_APP_MODE || "trade";
+const appConfig = configs[mode] || configs.trade;
 
 export default appConfig;
 export { configs };
