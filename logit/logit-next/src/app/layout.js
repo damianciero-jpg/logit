@@ -31,8 +31,6 @@ export const viewport = {
   themeColor:    appConfig.colors.primary,
   width:         "device-width",
   initialScale:  1,
-  maximumScale:  1,
-  userScalable:  false,
 };
 
 // ── Root layout ──────────────────────────────────────────────────────────────

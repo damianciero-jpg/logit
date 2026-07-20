@@ -300,14 +300,16 @@ test.describe("4 · Malformed AI response is handled gracefully", () => {
     expect(pageErrors).toHaveLength(0);
   });
 
-  test("vehicle log: aiError=true response → pre-fill banner shown, no undefined text", async ({
+  test("vehicle log: aiError=true response → 'Couldn't auto-fill' toast, form not wiped", async ({
     page,
   }) => {
     const pageErrors = [];
     page.on("pageerror", (e) => pageErrors.push(e.message));
 
-    // aiError=true without an `error` key → no toast; setVehicleAiDraft(data) is called
-    // but the draft has no structured fields, so form fields stay empty.
+    // aiError=true without an `error` key is treated the same as an error:
+    // the client must show the fallback toast and must NOT call
+    // setVehicleAiDraft (which would wipe the form and show a false
+    // "pre-filled" banner for a response with no structured fields).
     await page.route("/api/vehicle-log", (route) =>
       route.fulfill({
         status: 200,
@@ -324,10 +326,10 @@ test.describe("4 · Malformed AI response is handled gracefully", () => {
     await waitForChunk(page);
     await page.click('[aria-label="Stop recording"]');
 
-    // aiDraft is set (no error key), so the "pre-filled" banner appears
+    await expectToast(page, "Couldn't auto-fill");
     await expect(
       page.locator("text=Fields pre-filled from your recording")
-    ).toBeVisible({ timeout: 7000 });
+    ).not.toBeVisible();
     await expect(page.locator("text=undefined")).not.toBeVisible();
     expect(pageErrors).toHaveLength(0);
   });

@@ -112,8 +112,12 @@ export default function RecordingScreen({
         ))}
       </div>
 
-      <p className="text-[11px] text-white/20 uppercase tracking-widest">
-        Tap anywhere to stop
+      <p
+        className={`text-[11px] uppercase tracking-widest ${
+          recordingSeconds >= 150 ? "text-amber-400" : "text-white/20"
+        }`}
+      >
+        {recordingSeconds >= 150 ? "Auto-stops at 3:00" : "Tap anywhere to stop"}
       </p>
     </div>
   );

@@ -10,10 +10,17 @@ import RecordingScreen from "@/components/RecordingScreen";
 import ResultScreen from "@/components/ResultScreen";
 import LogsScreen from "@/components/LogsScreen";
 import VehicleLogScreen from "@/components/VehicleLogScreen";
+import UpgradeSheet from "@/components/UpgradeSheet";
+import {
+  addPhotos,
+  getPhotos,
+  getPhotoCounts,
+  deletePhotosForLog,
+  compressImage,
+} from "@/lib/photoStore";
 
 const BUILD_MODE = process.env.NEXT_PUBLIC_APP_MODE || "educator";
 const IS_DEV     = process.env.NODE_ENV === "development";
-const FREE_LIMIT = 10;
 
 // ── localStorage helpers ─────────────────────────────────────────────────────
 function lsGet(key, fallback = null) {
@@ -43,7 +50,7 @@ function StatusBar({ isDark, usage }) {
         </span>
       </div>
       <span className={`text-[11px] font-mono ${isDark ? "text-white/25" : "text-slate-400"}`}>
-        {usage} / {FREE_LIMIT}
+        {usage} / {config.freeLimit}
       </span>
     </div>
   );
@@ -140,23 +147,53 @@ function AppShell() {
   const [vehicleAiDraft, setVehicleAiDraft] = useState(null);
   const [vehiclePhase,   setVehiclePhase]   = useState("idle"); // "idle" | "processing"
 
+  // ── Photos (staged before save, then persisted to IndexedDB) ───────────────
+  const [pendingPhotos, setPendingPhotos] = useState([]); // [{ id, blob, url }]
+  const [photoCounts,   setPhotoCounts]   = useState({}); // { logId: count }
+
+  // ── Upgrade sheet (shown when the free limit blocks recording) ─────────────
+  const [showUpgrade, setShowUpgrade] = useState(false);
+
   const recorder = useMediaRecorder();
+
+  function refreshPhotoCounts() {
+    getPhotoCounts().then(setPhotoCounts).catch(() => {});
+  }
 
   // ── Mount: hydrate from localStorage ──────────────────────────────────────
   useEffect(() => {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const savedMonth   = lsGet("logit_usage_month");
+    let resolvedUsage = 0;
     if (savedMonth !== currentMonth) {
       lsSet("logit_usage_month", currentMonth);
       lsSet("logit_monthly_usage", "0");
       setUsage(0);
     } else {
-      setUsage(parseInt(lsGet("logit_monthly_usage", "0"), 10));
+      resolvedUsage = parseInt(lsGet("logit_monthly_usage", "0"), 10);
+      setUsage(resolvedUsage);
     }
     try { setLogs(JSON.parse(lsGet("logit_logs", "[]"))); } catch { setLogs([]); }
     try { setVehicleLogs(JSON.parse(lsGet("logit_vehicle_logs", "[]"))); } catch { setVehicleLogs([]); }
     setDistrict(lsGet("logit_district", "none"));
+    refreshPhotoCounts();
+
+    // PWA shortcut / deep-link tab (e.g. ?tab=record from the manifest shortcut).
+    const queryTab  = searchParams.get("tab");
+    const validTabs = ["home", "record", "logs", ...(IS_TRADE ? ["vehicle"] : [])];
+    if (validTabs.includes(queryTab)) {
+      if (queryTab === "record") {
+        if (resolvedUsage < activeConfig.freeLimit) {
+          setRecordingFor("job");
+          setTab("record");
+        }
+      } else {
+        setTab(queryTab);
+      }
+    }
+
     setMounted(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Send audio blob to the appropriate pipeline when recording finishes ──────
@@ -172,8 +209,9 @@ function AppShell() {
     setPhase("processing");
     setAiError("");
 
+    const ext = blob.type?.includes("mp4") ? "mp4" : blob.type?.includes("ogg") ? "ogg" : "webm";
     const fd = new FormData();
-    fd.append("audio", blob, "recording.webm");
+    fd.append("audio", blob, `recording.${ext}`);
     fd.append("appMode", activeMode);
     fd.append("districtId", district);
 
@@ -208,7 +246,7 @@ function AppShell() {
       const res  = await fetch("/api/vehicle-log", { method: "POST", body: fd });
       const data = await res.json();
       console.log("[vehicle-log] response status:", res.status, "body:", data);
-      if (data.error) {
+      if (data.error || data.aiError) {
         showToast("Couldn't auto-fill — fill the form manually.");
       } else {
         setVehicleAiDraft(data);
@@ -253,6 +291,8 @@ function AppShell() {
       diagnostic_findings:    edited.diagnostic_findings    ?? null,
       materials_used:         edited.materials_used         ?? null,
       recommended_next_steps: edited.recommended_next_steps ?? null,
+      job_ref:                edited.job_ref                ?? null,
+      trip_notes:             edited.trip_notes              ?? null,
       createdAt: new Date().toISOString(),
     };
     const updated = [entry, ...logs];
@@ -261,6 +301,13 @@ function AppShell() {
     const nextUsage = usage + 1;
     setUsage(nextUsage);
     lsSet("logit_monthly_usage", String(nextUsage));
+
+    if (pendingPhotos.length) {
+      addPhotos(entry.id, pendingPhotos.map((p) => p.blob))
+        .then(refreshPhotoCounts)
+        .catch(() => {});
+    }
+
     discard();
     setTab("home");
     showToast("✓ Log saved");
@@ -270,13 +317,75 @@ function AppShell() {
     setPhase("idle");
     setEdited(null);
     setAiError("");
+    pendingPhotos.forEach((p) => URL.revokeObjectURL(p.url));
+    setPendingPhotos([]);
   }
 
   function deleteLog(id) {
     const updated = logs.filter((l) => l.id !== id);
     setLogs(updated);
     lsSet("logit_logs", JSON.stringify(updated));
+    deletePhotosForLog(id).then(refreshPhotoCounts).catch(() => {});
     showToast("Log deleted");
+  }
+
+  // ── Photo staging (before save) ─────────────────────────────────────────────
+  async function handleAddPhoto(fileList) {
+    const files = Array.from(fileList ?? []);
+    const staged = await Promise.all(
+      files.map(async (file) => {
+        const blob = await compressImage(file);
+        return {
+          id: `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          blob,
+          url: URL.createObjectURL(blob),
+        };
+      })
+    );
+    setPendingPhotos((prev) => [...prev, ...staged]);
+  }
+
+  function handleRemovePhoto(id) {
+    setPendingPhotos((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) URL.revokeObjectURL(target.url);
+      return prev.filter((p) => p.id !== id);
+    });
+  }
+
+  async function loadPhotosForLog(logId) {
+    try {
+      return await getPhotos(logId);
+    } catch {
+      return [];
+    }
+  }
+
+  // ── Customer share (trade mode) ─────────────────────────────────────────────
+  function handleShare(log) {
+    const cs = activeConfig.customerShare;
+    if (!cs) return;
+    const text = [
+      cs.intro,
+      "",
+      cs.foundLabel,
+      log.client_issue ?? "",
+      "",
+      cs.didLabel,
+      log.action_taken ?? "",
+      "",
+      cs.nextLabel,
+      log.recommended_next_steps || log.follow_up || "",
+      "",
+      cs.signoff,
+    ].join("\n");
+
+    if (navigator.share) {
+      navigator.share({ text }).catch(() => {});
+    } else {
+      navigator.clipboard?.writeText(text);
+      showToast("✓ Copied — paste into your text or email");
+    }
   }
 
   // ── Copy text builder ──────────────────────────────────────────────────────
@@ -332,8 +441,8 @@ function AppShell() {
 
   // Home CTA — navigate to idle RecordingScreen; mic tap there actually starts.
   function handleNavigateToRecord() {
-    if (usage >= FREE_LIMIT) {
-      showToast(`Free limit of ${FREE_LIMIT} reached.`);
+    if (usage >= activeConfig.freeLimit) {
+      setShowUpgrade(true);
       return;
     }
     setRecordingFor("job");
@@ -342,6 +451,7 @@ function AppShell() {
 
   // Called by the mic button on the idle RecordingScreen.
   async function handleStartRecording() {
+    setRecordingFor("job");
     await recorder.startRecording();
   }
 
@@ -351,6 +461,10 @@ function AppShell() {
   }
 
   function handleTabChange(id) {
+    if (id === "record" && usage >= activeConfig.freeLimit) {
+      setShowUpgrade(true);
+      return;
+    }
     if (phase === "result") discard();
     setTab(id);
   }
@@ -403,6 +517,10 @@ function AppShell() {
               onSave={saveLog}
               onDiscard={discard}
               onCopy={copyEdited}
+              onShare={handleShare}
+              photos={pendingPhotos}
+              onAddPhoto={IS_TRADE ? handleAddPhoto : undefined}
+              onRemovePhoto={handleRemovePhoto}
               aiError={aiError}
             />
           )}
@@ -424,11 +542,12 @@ function AppShell() {
                 <HomeScreen
                   logs={mounted ? logs : []}
                   usage={mounted ? usage : 0}
-                  freeLimit={FREE_LIMIT}
+                  freeLimit={activeConfig.freeLimit}
                   district={district}
                   onDistrictChange={handleDistrictChange}
                   onStartLogging={handleNavigateToRecord}
                   onModeToggle={IS_DEV ? handleModeToggle : undefined}
+                  onUpgradeTap={() => setShowUpgrade(true)}
                 />
               )}
               {tab === "record" && (
@@ -444,6 +563,9 @@ function AppShell() {
                   logs={mounted ? logs : []}
                   onDelete={deleteLog}
                   onCopy={copyLog}
+                  onShare={IS_TRADE ? handleShare : undefined}
+                  photoCounts={photoCounts}
+                  onLoadPhotos={loadPhotosForLog}
                 />
               )}
               {tab === "vehicle" && (
@@ -481,6 +603,15 @@ function AppShell() {
             >
               {toast}
             </div>
+          )}
+
+          {/* ── Upgrade sheet (shown at the free limit) ── */}
+          {showUpgrade && (
+            <UpgradeSheet
+              onClose={() => setShowUpgrade(false)}
+              usage={usage}
+              freeLimit={activeConfig.freeLimit}
+            />
           )}
         </div>
       </div>

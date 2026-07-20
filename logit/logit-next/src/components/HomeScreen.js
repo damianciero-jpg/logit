@@ -18,7 +18,11 @@ export default function HomeScreen({
 
   const lastLog = logs[0] ?? null;
   const usagePct = Math.min((usage / freeLimit) * 100, 100);
-  const daysLeft = 30 - new Date().getDate();
+  const now = new Date();
+  const daysLeft = Math.max(
+    0,
+    new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate()
+  );
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const jobsThisWeek = logs.filter((l) => new Date(l.createdAt) >= weekAgo).length;
   const atLimit = usage >= freeLimit;

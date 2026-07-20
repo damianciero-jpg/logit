@@ -6,6 +6,14 @@ import { useEffect } from "react";
 // Rendered as a null component inside RootLayout.
 export default function PWAProvider() {
   useEffect(() => {
+    // Ask the browser to persist storage so iOS is less likely to evict
+    // IndexedDB (photos) and localStorage (logs) under storage pressure.
+    try {
+      navigator.storage?.persist?.();
+    } catch {
+      // Non-fatal — persistence is a best-effort hint, not a requirement.
+    }
+
     if (!("serviceWorker" in navigator)) return;
 
     let registration;

@@ -21,6 +21,9 @@ function pickMimeType() {
   return ""; // let the browser decide
 }
 
+// Hard cap so a forgotten-open recording doesn't run (and upload) forever.
+const MAX_RECORDING_SECONDS = 180;
+
 export function useMediaRecorder() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -44,6 +47,16 @@ export function useMediaRecorder() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
   }
+
+  const stopRecording = useCallback(() => {
+    clearInterval(timerRef.current);
+    setIsRecording(false);
+
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop(); // triggers onstop → assembles blob
+    }
+  }, []);
 
   const startRecording = useCallback(async () => {
     setError(null);
@@ -125,19 +138,13 @@ export function useMediaRecorder() {
     setIsRecording(true);
 
     timerRef.current = setInterval(() => {
-      setRecordingSeconds((s) => s + 1);
+      setRecordingSeconds((s) => {
+        const next = s + 1;
+        if (next >= MAX_RECORDING_SECONDS) stopRecording();
+        return next;
+      });
     }, 1000);
-  }, []);
-
-  const stopRecording = useCallback(() => {
-    clearInterval(timerRef.current);
-    setIsRecording(false);
-
-    const recorder = recorderRef.current;
-    if (recorder && recorder.state !== "inactive") {
-      recorder.stop(); // triggers onstop → assembles blob
-    }
-  }, []);
+  }, [stopRecording]);
 
   return { isRecording, recordingSeconds, audioBlob, error, startRecording, stopRecording };
 }

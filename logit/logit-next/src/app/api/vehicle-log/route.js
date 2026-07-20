@@ -2,6 +2,8 @@
 // Accepts audio blob → Groq Whisper transcription → Claude structured extraction.
 // Returns a JSON draft with type-specific fields pre-filled for the form.
 
+import { apiGuard } from "@/lib/apiGuard";
+
 export async function POST(req) {
   // ── API key guards ─────────────────────────────────────────────────────────
   if (!process.env.GROQ_API_KEY) {
@@ -25,6 +27,9 @@ export async function POST(req) {
     return Response.json({ error: "No audio file" }, { status: 400 });
   }
 
+  const guardResponse = apiGuard(req, audio);
+  if (guardResponse) return guardResponse;
+
   console.log("[vehicle-log] audio received — size:", audio.size, "type:", audio.type);
 
   // ── Step 1: Whisper transcription via Groq ────────────────────────────────
@@ -38,7 +43,7 @@ export async function POST(req) {
   try {
     const whisperForm = new FormData();
     whisperForm.append("file", audio, `recording.${ext}`);
-    whisperForm.append("model", "whisper-large-v3");
+    whisperForm.append("model", "whisper-large-v3-turbo");
 
     const whisperRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",
@@ -120,7 +125,7 @@ Rules:
     }
 
     const aiData = await aiRes.json();
-    const raw = aiData.content?.[0]?.text ?? "{}";
+    const raw = aiData.content?.find((block) => block.type === "text")?.text ?? "{}";
     const clean = raw.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
 

@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 export const size = { width: 512, height: 512 };
 export const contentType = "image/png";
 
-// Served at /icon.png — referenced by manifest.json and browser tab favicon.
+// Served at /icon (generated route) — referenced by manifest.json and browser tab favicon.
 export default function Icon() {
   const mode    = process.env.NEXT_PUBLIC_APP_MODE || "educator";
   const isTrade = mode === "trade";

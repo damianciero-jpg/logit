@@ -55,21 +55,23 @@ export default function manifest() {
     theme_color: cfg.theme_color,
     categories: cfg.categories,
     shortcuts: cfg.shortcuts,
+    // icon.js / apple-icon.js are generated Route Handlers, not static files —
+    // Next.js serves them at /icon and /apple-icon (not /icon.png).
     icons: [
       {
-        src: "/icon.png",
+        src: "/icon",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon.png",
+        src: "/icon",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
       },
       {
-        src: "/apple-icon.png",
+        src: "/apple-icon",
         sizes: "180x180",
         type: "image/png",
         purpose: "any",

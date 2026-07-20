@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
-// Served at /apple-icon.png — used by iOS for the home-screen icon.
+// Served at /apple-icon (generated route) — used by iOS for the home-screen icon.
 export default function AppleIcon() {
   const mode    = process.env.NEXT_PUBLIC_APP_MODE || "educator";
   const isTrade = mode === "trade";

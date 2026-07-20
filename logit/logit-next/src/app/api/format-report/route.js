@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiGuard } from "@/lib/apiGuard";
 
 const WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
@@ -9,11 +10,14 @@ const CLAUDE_MODEL = "claude-sonnet-4-6";
 
 async function transcribeAudio(audioFile) {
   const form = new FormData();
-  // Whisper requires a filename with an extension it recognises.
+  // Whisper requires a filename with an extension it recognises. Derive it
+  // from the actual mime type rather than trusting the client-supplied
+  // filename — Safari records audio/mp4 but the client always names the
+  // blob "recording.webm", which caused Whisper to misparse the container.
   const ext = audioFile.type?.includes("mp4") ? "mp4"
     : audioFile.type?.includes("ogg") ? "ogg"
     : "webm";
-  form.append("file", audioFile, audioFile.name || `recording.${ext}`);
+  form.append("file", audioFile, `recording.${ext}`);
   form.append("model", "whisper-large-v3-turbo");
   form.append("language", "en");
 
@@ -214,7 +218,7 @@ async function formatWithClaude(transcript, appMode, districtId) {
   }
 
   const data = await res.json();
-  const raw = data.content?.[0]?.text ?? "";
+  const raw = data.content?.find((block) => block.type === "text")?.text ?? "";
 
   // Strip optional markdown fences Claude occasionally emits.
   const jsonStr = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -259,6 +263,9 @@ export async function POST(request) {
       { status: 400 }
     );
   }
+
+  const guardResponse = apiGuard(request, audioFile);
+  if (guardResponse) return guardResponse;
 
   // Warmup ping — tiny blob sent at app startup to reduce cold-start latency.
   if (audioFile.size < 100) {
